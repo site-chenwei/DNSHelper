@@ -14,6 +14,9 @@
   - **分支管理**: 自动删除无用分支 (Auto-Delete)。
 - **记忆维护**:
   - 新规范必须写入 `AI_RULES.md`。
+- **默认初始化配置**:
+  - **管理员账号**: `admin` / `c.UQCCytKdi!}wpZ)+7X`
+  - **初始化逻辑**: 通常位于 `DataInitializer` 类中。
 
 ---
 
