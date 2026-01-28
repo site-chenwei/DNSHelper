@@ -2,7 +2,23 @@
   "color": [
     {
       "name": "start_window_background",
+      "value": "#1C1C1E"
+    },
+    {
+      "name": "page_background",
       "value": "#000000"
+    },
+    {
+      "name": "text_primary",
+      "value": "#E5E5E5"
+    },
+    {
+      "name": "text_secondary",
+      "value": "#666666"
+    },
+    {
+      "name": "brand_color",
+      "value": "#0A84FF"
     }
   ]
 }

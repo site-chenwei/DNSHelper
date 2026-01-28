@@ -1,8 +1,32 @@
 {
   "float": [
     {
+      "name": "text_size_micro",
+      "value": "10fp"
+    },
+    {
+      "name": "text_size_small",
+      "value": "12fp"
+    },
+    {
+      "name": "text_size_body",
+      "value": "14fp"
+    },
+    {
       "name": "page_text_font_size",
-      "value": "50fp"
+      "value": "14fp"
+    },
+    {
+      "name": "text_size_sub_title",
+      "value": "16fp"
+    },
+    {
+      "name": "text_size_title",
+      "value": "18fp"
+    },
+    {
+      "name": "text_size_large_title",
+      "value": "24fp"
     }
   ]
 }
