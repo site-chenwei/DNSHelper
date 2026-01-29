@@ -70,23 +70,14 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
         console.warn(TAG, `Failed to get physical network DNS: ${JSON.stringify(e)}`);
       }
       
-      // 策略B: 补充常见公共 DNS (防止系统 fallback 到备用公共 DNS)
-      // 精简列表，避免触发 -105 (路由条目过多或冲突)
-      const commonPublicDns = [
-        "114.114.114.114", // 114
-        "8.8.8.8",         // Google
-        "223.5.5.5"        // Ali
-      ];
+      // 去重
+      targetDnsList = Array.from(new Set(targetDnsList));
       
-      // 合并去重
-      targetDnsList = Array.from(new Set([...targetDnsList, ...commonPublicDns]));
-      
-      // 限制路由条目总数，防止 -105 错误
-      if (targetDnsList.length > 5) {
-          console.warn(TAG, `Too many DNS routes (${targetDnsList.length}), truncating to 5`);
-          targetDnsList = targetDnsList.slice(0, 5);
+      // 如果探测失败且列表为空（极少见），至少保留一个兜底
+      if (targetDnsList.length === 0) {
+          targetDnsList.push("114.114.114.114");
       }
-      
+
       console.info(TAG, `Final VPN DNS List: ${JSON.stringify(targetDnsList)}`);
       
       // 如果探测失败且列表为空（极少见），至少保留一个兜底
