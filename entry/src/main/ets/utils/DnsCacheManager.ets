@@ -38,7 +38,7 @@ export class DnsCacheManager {
     this.ttl = ttl;
     this.maxSize = size;
     
-    // Trim cache if needed
+    // 如果需要，修剪缓存
     if (this.cache.size > this.maxSize) {
       this.cache.clear(); // 简单处理：清空
     }

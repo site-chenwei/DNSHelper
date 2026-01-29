@@ -1,5 +1,5 @@
 import { DnsInfo, DnsType } from '../model/DnsInfo';
-import { SelectOptions, router } from '@kit.ArkUI';
+import { router } from '@kit.ArkUI';
 import { DnsDataManager } from '../utils/DnsDataManager';
 import { promptAction } from '@kit.ArkUI';
 
@@ -13,7 +13,6 @@ interface DropdownOption {
 struct DnsEditPage {
   @State name: string = '';
   @State primaryDns: string = '';
-  @State secondaryDns: string = '';
   @State selectedType: DnsType = DnsType.PURE;
   @State isEditMode: boolean = false;
   @State currentId: string = '';
@@ -30,121 +29,159 @@ struct DnsEditPage {
       if (dns) {
         this.name = dns.name;
         this.primaryDns = dns.primaryDns;
-        this.secondaryDns = dns.secondaryDns;
         this.selectedType = dns.type || DnsType.PURE;
       }
+    }
+  }
+
+  @Builder
+  InputCell(title: string, placeholder: string, value: string, onChange: (val: string) => void) {
+    Row() {
+      Text(title)
+        .width(80)
+        .fontSize($r('app.float.text_size_body'))
+        .fontColor($r('app.color.text_primary'))
+      
+      TextInput({ text: value, placeholder: placeholder })
+        .textAlign(TextAlign.Start)
+        .fontSize($r('app.float.text_size_body'))
+        .fontColor($r('app.color.text_primary'))
+        .placeholderColor($r('app.color.text_secondary'))
+        .backgroundColor(Color.Transparent)
+        .height('100%')
+        .layoutWeight(1)
+        .onChange(onChange)
+    }
+    .width('100%')
+    .height($r('app.float.list_item_height'))
+    .padding({ left: 16, right: 16 })
+    .backgroundColor($r('app.color.card_background'))
+  }
+
+  @Builder
+  SelectCell(title: string, value: string, options: string[], onSelect: (val: string) => void) {
+    Row() {
+      Text(title)
+        .width(80)
+        .fontSize($r('app.float.text_size_body'))
+        .fontColor($r('app.color.text_primary'))
+      
+      Select(options.map((v): DropdownOption => ({ value: v })))
+        .selected(options.indexOf(value))
+        .value(value)
+        .font({ size: $r('app.float.text_size_body') })
+        .selectedOptionFont({ size: $r('app.float.text_size_body') })
+        .optionFont({ size: $r('app.float.text_size_body') })
+        .backgroundColor(Color.Transparent)
+        .onSelect((index: number, val: string) => onSelect(val))
+        .height('100%')
+        .layoutWeight(1)
+    }
+    .width('100%')
+    .height($r('app.float.list_item_height'))
+    .padding({ left: 16, right: 0 })
+    .backgroundColor($r('app.color.card_background'))
+  }
+
+  async save() {
+    if (this.name && this.primaryDns) {
+      if (this.isEditMode) {
+        const dns = new DnsInfo(this.name, this.primaryDns, false, this.selectedType);
+        dns.id = this.currentId; // 保持 ID 不变
+        await DnsDataManager.getInstance().updateDns(dns);
+        promptAction.showToast({ message: '修改成功' });
+      } else {
+        const dns = new DnsInfo(this.name, this.primaryDns, false, this.selectedType);
+        await DnsDataManager.getInstance().addDns(dns);
+        promptAction.showToast({ message: '添加成功' });
+      }
+      router.back();
+    } else {
+      promptAction.showToast({ message: '请填写完整信息' });
     }
   }
 
   build() {
     Column() {
       // 标题栏
-      Column() {
-        Stack({ alignContent: Alignment.Start }) {
-          // 标题
-          Text(this.isEditMode ? '编辑 DNS' : '添加 DNS')
-            .width('100%')
-            .textAlign(TextAlign.Center)
-            .fontSize($r('app.float.text_size_large_title'))
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.text_primary'))
-
-          // 返回按钮
-          Row() {
-            Path()
-              .commands('M14 6 L8 12 L14 18')
-              .fill(Color.Transparent)
-              .stroke($r('app.color.text_primary'))
-              .strokeWidth(2)
-              .width(12)
-              .height(24)
-          }
-          .width(56)
-          .height(56)
-          .justifyContent(FlexAlign.Center)
-          .alignItems(VerticalAlign.Center)
-          .onClick(() => {
-            router.back();
-          })
-          .zIndex(1)
+      Stack({ alignContent: Alignment.Center }) {
+        // 返回按钮
+        Row() {
+          Path()
+            .commands('M14 6 L8 12 L14 18')
+            .fill(Color.Transparent)
+            .stroke($r('app.color.text_primary'))
+            .strokeWidth(2)
+            .width(12)
+            .height(24)
         }
+        .width(56)
         .height(56)
-        .width('100%')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(VerticalAlign.Center)
+        .onClick(() => {
+          router.back();
+        })
+        .position({ x: 0, y: 0 })
+        .zIndex(1)
+
+        // 标题
+        Text(this.isEditMode ? '编辑 DNS' : '添加 DNS')
+          .fontSize($r('app.float.text_size_title'))
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.text_primary'))
+          .textAlign(TextAlign.Center)
+
+        // 保存按钮
+        Row() {
+          Button('完成')
+            .onClick(() => this.save())
+            .fontSize($r('app.float.text_size_body'))
+            .fontColor($r('app.color.brand_color'))
+            .backgroundColor(Color.Transparent)
+            .padding({ right: 16 })
+        }
+        .height('100%')
+        .justifyContent(FlexAlign.End)
+        .alignItems(VerticalAlign.Center)
+        .position({ x: '100%', y: 0 })
+        .markAnchor({ x: '100%', y: 0 })
+        .zIndex(1)
       }
       .width('100%')
-      .padding({ top: this.topSafeHeight })
-      .backgroundColor($r('app.color.start_window_background'))
-      .shadow({ radius: 2, color: '#1a000000', offsetY: 1 })
-      .zIndex(10)
+      .height(44)
+      .margin({ top: 10, bottom: 10 })
 
-      Column() {
-        TextInput({ placeholder: '服务名称', text: this.name })
-          .onChange((value: string) => {
-            this.name = value;
-          })
-          .margin({ bottom: 12 })
+      List() {
+        ListItem() {
+          Column() {
+            this.InputCell('名称', '请输入服务名称', this.name, (value) => this.name = value)
+            Divider()
+              .color($r('app.color.divider_color'))
+              .strokeWidth(0.5)
+              .padding({ left: 16 })
+            
+            this.SelectCell('类型', this.selectedType, Object.values(DnsType), (value) => this.selectedType = value as DnsType)
+            Divider()
+              .color($r('app.color.divider_color'))
+              .strokeWidth(0.5)
+              .padding({ left: 16 })
+            
+            this.InputCell('DNS', '请输入DNS地址', this.primaryDns, (value) => this.primaryDns = value)
+          }
           .width('100%')
-
-        Row() {
-          Text('类型：')
-            .fontSize($r('app.float.text_size_body'))
-          Select(Object.values(DnsType).map((value: string): DropdownOption => {
-            return { value: value };
-          }))
-            .selected(Object.values(DnsType).indexOf(this.selectedType))
-            .value(this.selectedType)
-            .font({ size: $r('app.float.text_size_body') })
-            .selectedOptionFont({ size: $r('app.float.text_size_body') })
-            .optionFont({ size: $r('app.float.text_size_body') })
-            .onSelect((index: number, value: string) => {
-              this.selectedType = value as DnsType;
-            })
-            .height(40)
-            .layoutWeight(1)
+          .borderRadius(12)
+          .clip(true)
+          .backgroundColor($r('app.color.card_background'))
         }
-        .width('100%')
-        .margin({ bottom: 12 })
-        .justifyContent(FlexAlign.Start)
-
-        TextInput({ placeholder: '主 DNS', text: this.primaryDns })
-          .onChange((value: string) => {
-            this.primaryDns = value;
-          })
-          .margin({ bottom: 12 })
-          .width('100%')
-
-        TextInput({ placeholder: '备用 DNS (可选)', text: this.secondaryDns })
-          .onChange((value: string) => {
-            this.secondaryDns = value;
-          })
-          .margin({ bottom: 20 })
-          .width('100%')
-
-        Button('保存')
-          .onClick(async () => {
-            if (this.name && this.primaryDns) {
-              if (this.isEditMode) {
-                const dns = new DnsInfo(this.name, this.primaryDns, this.secondaryDns, false, this.selectedType);
-                dns.id = this.currentId; // 保持 ID 不变
-                await DnsDataManager.getInstance().updateDns(dns);
-                promptAction.showToast({ message: '修改成功' });
-              } else {
-                const dns = new DnsInfo(this.name, this.primaryDns, this.secondaryDns, false, this.selectedType);
-                await DnsDataManager.getInstance().addDns(dns);
-                promptAction.showToast({ message: '添加成功' });
-              }
-              router.back();
-            } else {
-              promptAction.showToast({ message: '请填写完整信息' });
-            }
-          })
-          .width('100%')
-          .backgroundColor($r('app.color.brand_color'))
+        .padding({ left: 16, right: 16 })
       }
-      .padding(16)
+      .width('100%')
+      .layoutWeight(1)
     }
     .width('100%')
     .height('100%')
-    .backgroundColor($r('app.color.page_background'))
+    .backgroundColor($r('app.color.page_grouped_background'))
+    .padding({ top: this.topSafeHeight })
   }
 }

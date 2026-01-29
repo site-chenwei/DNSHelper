@@ -19,6 +19,46 @@
     {
       "name": "brand_color",
       "value": "#007DFF"
+    },
+    {
+      "name": "status_active_bg",
+      "value": "#E5F2FF"
+    },
+    {
+      "name": "status_inactive_bg",
+      "value": "#F2F2F7"
+    },
+    {
+      "name": "button_inactive_bg",
+      "value": "#E5E5EA"
+    },
+    {
+      "name": "card_background",
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "card_shadow",
+      "value": "#1A000000"
+    },
+    {
+      "name": "page_grouped_background",
+      "value": "#F2F2F7"
+    },
+    {
+      "name": "badge_background",
+      "value": "#F2F2F7"
+    },
+    {
+      "name": "functional_red",
+      "value": "#FF3B30"
+    },
+    {
+      "name": "divider_color",
+      "value": "#1A000000"
+    },
+    {
+      "name": "tab_bar_background",
+      "value": "#F7F7F7"
     }
   ]
 }

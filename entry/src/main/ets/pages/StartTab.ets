@@ -5,6 +5,47 @@ import { vpnExtension } from '@kit.NetworkKit';
 import { Want } from '@kit.AbilityKit';
 
 @Component
+struct SettingsItem {
+  @Prop title: string = '';
+  @Prop value: string = '';
+  @Prop showArrow: boolean = true;
+  onClickHandler?: () => void;
+
+  build() {
+    Row() {
+      Text(this.title)
+        .fontSize($r('app.float.text_size_body'))
+        .fontColor($r('app.color.text_primary'))
+      
+      Blank()
+
+      Text(this.value)
+        .fontSize($r('app.float.text_size_body'))
+        .fontColor($r('app.color.text_secondary'))
+        .margin({ right: 4 })
+
+      if (this.showArrow) {
+        Path()
+          .commands('M10 6 L16 12 L10 18') // Simple arrow
+          .fill(Color.Transparent)
+          .stroke($r('app.color.text_secondary')) // Use secondary text color
+          .strokeWidth(2)
+          .width(12)
+          .height(24)
+          .opacity(0.3)
+      }
+    }
+    .width('100%')
+    .height($r('app.float.list_item_height'))
+    .padding({ left: 16, right: 16 })
+    .backgroundColor($r('app.color.card_background'))
+    .onClick(() => {
+      if (this.onClickHandler) this.onClickHandler();
+    })
+  }
+}
+
+@Component
 export default struct StartTab {
   @StorageProp('topSafeHeight') topSafeHeight: number = 0;
   @StorageLink('isRunning') isRunning: boolean = false;
@@ -14,13 +55,23 @@ export default struct StartTab {
   @State buttonScale: number = 1;
 
   aboutToAppear() {
-    DnsDataManager.getInstance().init(getContext(this));
+    // DnsDataManager 已经在 EntryAbility 中初始化，这里无需重复初始化
     this.updateCurrentDnsName();
   }
 
+  aboutToDisappear() {
+  }
+
   updateCurrentDnsName() {
+    console.info(`updateCurrentDnsName: currentDnsId=${this.currentDnsId}, dnsList.length=${this.dnsList.length}`);
     const dns = this.dnsList.find(i => i.id === this.currentDnsId);
-    this.currentDnsName = dns ? dns.name : '请选择 DNS';
+    if (dns) {
+      this.currentDnsName = dns.name;
+      console.info(`Found DNS: ${dns.name}`);
+    } else {
+      this.currentDnsName = '请选择 DNS';
+      console.info(`DNS not found for ID: ${this.currentDnsId}`);
+    }
   }
 
   async toggleRunning() {
@@ -53,12 +104,9 @@ export default struct StartTab {
 
   async startVpn() {
     const selectedDns = this.dnsList.find(d => d.id === this.currentDnsId);
-    let dnsIps: string[] = ['223.5.5.5', '223.6.6.6'];
+    let dnsIps: string[] = ['223.5.5.5'];
     if (selectedDns) {
       dnsIps = [selectedDns.primaryDns];
-      if (selectedDns.secondaryDns) {
-        dnsIps.push(selectedDns.secondaryDns);
-      }
     }
 
     const want: Want = {
@@ -107,10 +155,25 @@ export default struct StartTab {
       range: dnsNames,
       selected: selectedIndex >= 0 ? selectedIndex : 0,
       onAccept: (value: TextPickerResult) => {
-        const index = value.index as number; // 确保类型安全
+        let index: number;
+        if (Array.isArray(value.index)) {
+          index = value.index[0];
+        } else {
+          index = value.index;
+        }
+
+        console.info(`DNS Selector onAccept: index=${index}, value=${JSON.stringify(value)}`);
+
         if (index >= 0 && index < this.dnsList.length) {
           const selectedId = this.dnsList[index].id;
-          DnsDataManager.getInstance().setCurrentDnsId(selectedId);
+          console.info(`Switching DNS to: ${selectedId}`);
+          
+          // 使用 DnsDataManager 修改选中状态，不直接修改 @StorageProp
+          DnsDataManager.getInstance().setCurrentDnsId(selectedId).then(() => {
+             // 状态更新后，AppStorage 会通知 @StorageProp 更新，触发 @Watch
+             // 但为了更好的交互体验，可以手动调用一次 UI 刷新（虽然 @Watch 应该会处理）
+             console.info('DnsDataManager set completed');
+          });
         }
       }
     });
@@ -119,116 +182,76 @@ export default struct StartTab {
   build() {
     Column() {
       // 顶部标题区域
-      Row() {
+      Stack({ alignContent: Alignment.Center }) {
         Text('DNS Helper')
-          .fontSize(24)
+          .fontSize($r('app.float.text_size_title'))
           .fontWeight(FontWeight.Bold)
-        Blank()
-        Text(this.isRunning ? 'Running' : 'Stopped')
-          .fontSize(14)
-          .fontColor(this.isRunning ? '#007AFF' : '#8E8E93')
-          .fontWeight(FontWeight.Medium)
-          .backgroundColor(this.isRunning ? '#E5F2FF' : '#F2F2F7')
-          .padding({
-            left: 12,
-            right: 12,
-            top: 6,
-            bottom: 6
-          })
-          .borderRadius(16)
+          .fontColor($r('app.color.text_primary'))
+          .textAlign(TextAlign.Center)
       }
       .width('100%')
-      .padding({ left: 20, right: 20, top: 20 })
-      .alignItems(VerticalAlign.Center)
+      .height(44)
+      .margin({ top: 10, bottom: 10 })
 
       // 中间大按钮区域
       Column() {
         Button() {
-          Image(this.isRunning ? $r('app.media.startIcon') : $r('app.media.startIcon')) // 这里应该用不同的图标，暂用同一个
-            .width(60)
-            .height(60)
+          Image(this.isRunning ? $r('app.media.startIcon') : $r('app.media.startIcon')) 
+            .width(80)
+            .height(80)
             .fillColor(Color.White)
         }
-        .width(160)
-        .height(160)
-        .borderRadius(80)
-        .backgroundColor(this.isRunning ? '#007AFF' : '#E5E5EA') // 蓝色 vs 灰色
-        .shadow({ radius: 20, color: this.isRunning ? 'rgba(0,122,255,0.4)' : 'rgba(0,0,0,0.1)', offsetY: 10 })
+        .width(180)
+        .height(180)
+        .borderRadius(90)
+        .backgroundColor(this.isRunning ? $r('app.color.brand_color') : $r('app.color.button_inactive_bg'))
+        .shadow({ radius: 20, color: this.isRunning ? 'rgba(0,122,255,0.4)' : $r('app.color.card_shadow'), offsetY: 10 })
         .scale({ x: this.buttonScale, y: this.buttonScale })
         .onClick(() => {
           this.toggleRunning();
         })
 
-        Text(this.isRunning ? '已激活' : '点击启动')
-          .fontSize(16)
-          .fontColor('#8E8E93')
-          .margin({ top: 24 })
+        Text(this.isRunning ? '已保护' : '点击启动')
+          .fontSize($r('app.float.text_size_sub_title'))
+          .fontColor($r('app.color.text_primary'))
+          .fontWeight(FontWeight.Medium)
+          .margin({ top: 30 })
+        
+        Text(this.isRunning ? 'VPN 服务运行中' : '未连接')
+          .fontSize($r('app.float.text_size_small'))
+          .fontColor($r('app.color.text_secondary'))
+          .margin({ top: 8 })
       }
       .flexGrow(1)
       .justifyContent(FlexAlign.Center)
 
-      // 底部卡片区域
-      Column({ space: 12 }) {
-        // 策略组卡片
-        Row() {
-          Column() {
-            Text('当前策略')
-              .fontSize(12)
-              .fontColor('#8E8E93')
-              .margin({ bottom: 4 })
-            Text(this.currentDnsName)
-              .fontSize(16)
-              .fontWeight(FontWeight.Medium)
+      // 底部功能列表
+      Column() {
+        List() {
+          ListItem() {
+            Column() {
+              SettingsItem({
+                title: '当前策略',
+                value: this.currentDnsName,
+                showArrow: true,
+                onClickHandler: () => {
+                  this.showDnsSelector();
+                }
+              })
+            }
+            .backgroundColor($r('app.color.card_background'))
+            .borderRadius(12)
+            .clip(true)
           }
-          .alignItems(HorizontalAlign.Start)
-
-          Blank()
-
-          Text('切换 >')
-            .fontSize(14)
-            .fontColor('#007AFF')
         }
         .width('100%')
-        .padding(16)
-        .backgroundColor(Color.White) // 这里应该适配深色模式，但在 ArkTS 中通常用系统资源或特定颜色
-        .borderRadius(16)
-        .shadow({ radius: 10, color: 'rgba(0,0,0,0.05)', offsetY: 4 })
-        .onClick(() => {
-          this.showDnsSelector();
-        })
-
-        // 简单的网络信息卡片 (静态模拟)
-        Row() {
-          Column() {
-            Text('出站模式')
-              .fontSize(12)
-              .fontColor('#8E8E93')
-              .margin({ bottom: 4 })
-            Text('直接连接')
-              .fontSize(16)
-              .fontWeight(FontWeight.Medium)
-          }
-          .alignItems(HorizontalAlign.Start)
-
-          Blank()
-
-          // 模拟一些图标或数据
-          Text('WIFI')
-            .fontSize(14)
-            .fontColor('#8E8E93')
-        }
-        .width('100%')
-        .padding(16)
-        .backgroundColor(Color.White)
-        .borderRadius(16)
-        .shadow({ radius: 10, color: 'rgba(0,0,0,0.05)', offsetY: 4 })
       }
       .width('100%')
-      .padding({ left: 20, right: 20, bottom: 40 })
+      .padding({ left: 16, right: 16, bottom: 20 })
     }
     .width('100%')
     .height('100%')
+    .backgroundColor($r('app.color.page_grouped_background'))
     .padding({ top: this.topSafeHeight })
-    .backgroundColor('#F2F2F7') // 浅灰背景，Surge 风格
   }
 }

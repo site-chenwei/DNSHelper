@@ -12,7 +12,6 @@ export default struct DnsEditDialog {
   
   @State name: string = '';
   @State primaryDns: string = '';
-  @State secondaryDns: string = '';
   @State selectedType: DnsType = DnsType.PURE;
 
   build() {
@@ -50,16 +49,9 @@ export default struct DnsEditDialog {
       .margin({ bottom: 12 })
       .justifyContent(FlexAlign.Start)
 
-      TextInput({ placeholder: '主 DNS', text: this.primaryDns })
+      TextInput({ placeholder: 'DNS', text: this.primaryDns })
         .onChange((value: string) => {
           this.primaryDns = value;
-        })
-        .margin({ bottom: 12 })
-        .width('90%')
-
-      TextInput({ placeholder: '备用 DNS (可选)', text: this.secondaryDns })
-        .onChange((value: string) => {
-          this.secondaryDns = value;
         })
         .margin({ bottom: 20 })
         .width('90%')
@@ -77,7 +69,7 @@ export default struct DnsEditDialog {
         Button('确定')
           .onClick(() => {
             if (this.name && this.primaryDns) {
-              const dns = new DnsInfo(this.name, this.primaryDns, this.secondaryDns, false, this.selectedType);
+              const dns = new DnsInfo(this.name, this.primaryDns, false, this.selectedType);
               this.onConfirm(dns);
               this.controller.close();
             }

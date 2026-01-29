@@ -10,7 +10,8 @@
 - **语言协议**:
   - **全中文输出**: 思考过程、工具参数、Todo 列表、代码注释、Git 提交信息必须使用中文。
 - **Git 工作流**:
-  - **严格被动提交 (Explicit Commit Only)**: 仅在用户明确指令下执行 Commit/Push。
+  - **严格被动提交 (Explicit Commit Only)**: 仅在用户明确指令下执行 Git 操作。
+  - **自动推送 (Auto Push)**: 获准提交代码后，必须自动执行 Push。
   - **分支管理**: 自动删除无用分支 (Auto-Delete)。
 - **记忆维护**:
   - 新规范必须写入 `AI_RULES.md`。
@@ -35,6 +36,11 @@
     - 优先使用 `@Builder` 复用 UI。
     - 状态管理: `@State` (组件内), `@Prop` (单向), `@Link` (双向)。
     - 必须启用 `strictMode` (build-profile.json5)。
+  - **数据持久化**:
+    - **Preferences**: 所有需持久化的数据必须使用 Preferences。
+    - **DataManager**: 
+      - 所有写操作必须封装在对应的 DataManager 中，禁止 UI 层直接操作存储。
+      - 初始化操作只能在 EntryAbility 中执行一次。
 
 - **工程结构**:
   ```text

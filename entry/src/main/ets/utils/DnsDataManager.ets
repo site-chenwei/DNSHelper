@@ -1,8 +1,10 @@
 import { DnsInfo, DEFAULT_DNS_LIST } from '../model/DnsInfo';
 import common from '@ohos.app.ability.common';
+import dataPreferences from '@ohos.data.preferences';
 
 export class DnsDataManager {
   private static instance: DnsDataManager;
+  private preferences: dataPreferences.Preferences | null = null;
 
   public static getInstance(): DnsDataManager {
     if (!DnsDataManager.instance) {
@@ -12,22 +14,72 @@ export class DnsDataManager {
   }
 
   async init(context: common.Context) {
-    // Ensure persistence
-    PersistentStorage.persistProp('dnsList', DEFAULT_DNS_LIST);
-    PersistentStorage.persistProp('currentDnsId', '');
-    PersistentStorage.persistProp('hasInitializedDns', false);
+    // 初始化 Preferences
+    try {
+      this.preferences = await dataPreferences.getPreferences(context, 'dns_helper_prefs');
+    } catch (e) {
+      console.error('Failed to get preferences', JSON.stringify(e));
+      // 如果初始化失败，使用默认值回退
+      AppStorage.setOrCreate('dnsList', DEFAULT_DNS_LIST);
+      AppStorage.setOrCreate('currentDnsId', '');
+      return;
+    }
 
-    const hasInitialized = AppStorage.get<boolean>('hasInitializedDns');
-    const currentList = AppStorage.get<DnsInfo[]>('dnsList');
-
-    if (!hasInitialized) {
-      // 首次运行或数据迁移：
-      // 1. 如果列表为空（旧数据残留导致），强制恢复默认列表
-      // 2. 如果列表已有数据（全新安装自动加载默认值，或老用户数据），仅标记已初始化
-      if (!currentList || currentList.length === 0) {
-        AppStorage.setOrCreate('dnsList', DEFAULT_DNS_LIST);
+    // 从 Preferences 加载 DNS 列表
+    let dnsList: DnsInfo[] = [];
+    try {
+      const jsonStr = await this.preferences.get('saved_dns_list', '') as string;
+      if (jsonStr) {
+        dnsList = JSON.parse(jsonStr) as DnsInfo[];
       }
-      AppStorage.setOrCreate('hasInitializedDns', true);
+    } catch (e) {
+      console.error('Failed to parse dns list', JSON.stringify(e));
+    }
+
+    // 如果为空或加载失败，使用默认值
+    if (dnsList.length === 0) {
+      dnsList = [...DEFAULT_DNS_LIST]; // 克隆默认列表
+      this.saveDnsListToPrefs(dnsList);
+    }
+    AppStorage.setOrCreate('dnsList', dnsList);
+
+    // 加载当前 DNS ID
+    let currentId = '';
+    try {
+      currentId = await this.preferences.get('saved_dns_id', '') as string;
+    } catch (e) {
+      console.error('Failed to load current id', JSON.stringify(e));
+    }
+
+    // 验证 ID 有效性
+    const isValid = currentId && dnsList.some(d => d.id === currentId);
+    console.info(`DnsDataManager init: loadedId=${currentId}, isValid=${isValid}`);
+
+    if (!isValid && dnsList.length > 0) {
+      currentId = dnsList[0].id;
+      console.info(`DnsDataManager init: resetting to first DNS: ${currentId}`);
+      this.saveCurrentIdToPrefs(currentId);
+    }
+    AppStorage.setOrCreate('currentDnsId', currentId);
+  }
+
+  private async saveDnsListToPrefs(list: DnsInfo[]) {
+    if (!this.preferences) return;
+    try {
+      await this.preferences.put('saved_dns_list', JSON.stringify(list));
+      await this.preferences.flush();
+    } catch (e) {
+      console.error('Failed to save dns list', JSON.stringify(e));
+    }
+  }
+
+  private async saveCurrentIdToPrefs(id: string) {
+    if (!this.preferences) return;
+    try {
+      await this.preferences.put('saved_dns_id', id);
+      await this.preferences.flush();
+    } catch (e) {
+      console.error('Failed to save current id', JSON.stringify(e));
     }
   }
 
@@ -39,6 +91,7 @@ export class DnsDataManager {
     const list = this.getDnsList();
     list.push(dns);
     AppStorage.setOrCreate('dnsList', list);
+    await this.saveDnsListToPrefs(list);
   }
 
   async updateDns(dns: DnsInfo) {
@@ -47,6 +100,7 @@ export class DnsDataManager {
     if (index !== -1) {
       list[index] = dns;
       AppStorage.setOrCreate('dnsList', list);
+      await this.saveDnsListToPrefs(list);
     }
   }
 
@@ -54,9 +108,21 @@ export class DnsDataManager {
     let list = this.getDnsList();
     list = list.filter(item => item.id !== id);
     AppStorage.setOrCreate('dnsList', list);
+    await this.saveDnsListToPrefs(list);
+
+    // 如果删除了当前选中的 DNS，尝试切换到第一个，或者置空
+    const currentId = AppStorage.get<string>('currentDnsId');
+    if (currentId === id) {
+      if (list.length > 0) {
+        await this.setCurrentDnsId(list[0].id);
+      } else {
+        await this.setCurrentDnsId('');
+      }
+    }
   }
   
   async setCurrentDnsId(id: string) {
       AppStorage.setOrCreate('currentDnsId', id);
+      await this.saveCurrentIdToPrefs(id);
   }
 }

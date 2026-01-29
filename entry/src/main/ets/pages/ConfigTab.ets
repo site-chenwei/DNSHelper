@@ -14,17 +14,15 @@ export default struct ConfigTab {
 
   @Builder
   DeleteButton(id: string) {
-    Button() {
+    Row() {
       Text('删除')
         .fontColor(Color.White)
-        .fontSize(12)
+        .fontSize(16)
     }
-    .width(60)
-    .height(40)
-    .type(ButtonType.Normal)
-    .borderRadius(20)
-    .backgroundColor(Color.Red)
-    .margin({ left: 10 })
+    .width(80)
+    .height('100%')
+    .justifyContent(FlexAlign.Center)
+    .backgroundColor($r('app.color.functional_red'))
     .onClick(async () => {
       await DnsDataManager.getInstance().removeDns(id);
       promptAction.showToast({ message: '删除成功' });
@@ -33,73 +31,74 @@ export default struct ConfigTab {
 
   build() {
     Column() {
-      Row() {
-        Text('配置页')
-          .fontSize($r('app.float.text_size_large_title'))
+      Stack({ alignContent: Alignment.Center }) {
+        Text('配置列表')
+          .fontSize($r('app.float.text_size_title'))
           .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.text_primary'))
         
-        Blank()
-
-        Button('添加')
-          .onClick(() => {
-            router.pushUrl({ url: 'pages/DnsEditPage' });
-          })
-          .fontSize($r('app.float.text_size_sub_title'))
-          .fontColor($r('app.color.brand_color'))
-          .backgroundColor(Color.Transparent)
+        Row() {
+          Blank()
+          Button('添加')
+            .onClick(() => {
+              router.pushUrl({ url: 'pages/DnsEditPage' });
+            })
+            .fontSize($r('app.float.text_size_body'))
+            .fontColor($r('app.color.brand_color'))
+            .backgroundColor(Color.Transparent)
+            .padding({ right: 0 })
+        }
+        .width('100%')
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 20, bottom: 20 })
-      .alignItems(VerticalAlign.Center)
+      .height(44)
+      .padding({ left: 16, right: 16 })
+      .margin({ top: 10, bottom: 10 })
 
-      List({ space: 10 }) {
+      List({ space: 12 }) {
         ForEach(this.dnsList, (item: DnsInfo) => {
           ListItem() {
             Column() {
               Row() {
                 Text(item.name)
-                  .fontSize($r('app.float.text_size_sub_title'))
+                  .fontSize($r('app.float.text_size_body'))
                   .fontColor($r('app.color.text_primary'))
-                  .fontWeight(500)
-
-                Text(item.type || DnsType.PURE)
-                  .fontSize($r('app.float.text_size_micro'))
-                  .fontColor($r('app.color.text_secondary'))
-                  .backgroundColor($r('app.color.start_window_background'))
-                  .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-                  .borderRadius(4)
-                  .margin({ left: 8 })
+                  .fontWeight(FontWeight.Medium)
 
                 if (item.isDefault) {
                   Text('默认')
                     .fontSize($r('app.float.text_size_micro'))
                     .fontColor($r('app.color.brand_color'))
-                    .backgroundColor($r('app.color.start_window_background'))
-                    .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+                    .backgroundColor($r('app.color.badge_background'))
+                    .padding({ left: 4, right: 4, top: 2, bottom: 2 })
                     .borderRadius(4)
                     .margin({ left: 8 })
                 }
+
+                Text(item.type || DnsType.PURE)
+                  .fontSize($r('app.float.text_size_micro'))
+                  .fontColor($r('app.color.text_secondary'))
+                  .backgroundColor($r('app.color.badge_background'))
+                  .padding({ left: 4, right: 4, top: 2, bottom: 2 })
+                  .borderRadius(4)
+                  .margin({ left: 8 })
+                
+                Blank()
               }
               .width('100%')
-              .justifyContent(FlexAlign.Start)
+              .alignItems(VerticalAlign.Center)
 
               Row() {
-                Text('主: ' + item.primaryDns)
+                Text(item.primaryDns)
                   .fontSize($r('app.float.text_size_small'))
                   .fontColor($r('app.color.text_secondary'))
-                  .margin({ right: 16 })
-                if (item.secondaryDns) {
-                  Text('备: ' + item.secondaryDns)
-                    .fontSize($r('app.float.text_size_small'))
-                    .fontColor($r('app.color.text_secondary'))
-                }
               }
               .width('100%')
-              .margin({ top: 4 })
+              .margin({ top: 6 })
             }
             .width('100%')
             .padding(16)
-            .backgroundColor($r('app.color.start_window_background'))
+            .backgroundColor($r('app.color.card_background'))
             .borderRadius(12)
             .alignItems(HorizontalAlign.Start)
             .onClick(() => {
@@ -116,6 +115,8 @@ export default struct ConfigTab {
             })
           }
           .swipeAction({ end: this.DeleteButton(item.id) })
+          .clip(true)
+          .borderRadius(12)
         }, (item: DnsInfo) => item.id)
       }
       .width('100%')
@@ -124,6 +125,7 @@ export default struct ConfigTab {
     }
     .width('100%')
     .height('100%')
+    .backgroundColor($r('app.color.page_grouped_background'))
     .padding({ top: this.topSafeHeight })
   }
 }

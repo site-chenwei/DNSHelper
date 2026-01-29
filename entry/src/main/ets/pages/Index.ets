@@ -43,7 +43,8 @@ struct Index {
     .height(56 + this.bottomSafeHeight)
     .padding({ bottom: this.bottomSafeHeight + 5, top: 5 })
     .justifyContent(FlexAlign.SpaceBetween)
-    .backgroundColor($r('app.color.start_window_background'))
+    .backgroundColor($r('app.color.tab_bar_background'))
+    .border({ width: { top: 0.5 }, color: $r('app.color.divider_color') })
     .onClick(() => {
       this.currentIndex = targetIndex;
       this.controller.changeIndex(this.currentIndex);
