@@ -1,6 +1,20 @@
 {
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:/Users/Bill/.ohos/config/default_DNSHelper_ePkTuMKtvAvku3qTtLUzvuM8K537tIUHxQQ8V5bMHTo=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001BB6A4A4A21C08384F44C049E4F021EF3D549350CC74717D02B38F1F6E84011A00B5DAFEC81C07BD",
+          "profile": "C:/Users/Bill/.ohos/config/default_DNSHelper_ePkTuMKtvAvku3qTtLUzvuM8K537tIUHxQQ8V5bMHTo=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:/Users/Bill/.ohos/config/default_DNSHelper_ePkTuMKtvAvku3qTtLUzvuM8K537tIUHxQQ8V5bMHTo=.p12",
+          "storePassword": "0000001BF27E1DBBF5EEBCEAB391566C3C91597368670CCEDE8C71D1B7A82C3DE684B2BE63FEFB9C29205D"
+        }
+      }
+    ],
     "products": [
       {
         "name": "default",

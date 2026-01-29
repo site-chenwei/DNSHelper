@@ -148,15 +148,44 @@ export class PacketUtil {
     view.setUint16(udpOffset + 0, srcPort);
     view.setUint16(udpOffset + 2, dstPort);
     view.setUint16(udpOffset + 4, udpHeaderLength + payload.byteLength);
-    view.setUint16(udpOffset + 6, 0); // UDP Checksum (optional for IPv4, set to 0)
+    view.setUint16(udpOffset + 6, 0); // UDP Checksum (initial 0)
 
     // Copy Payload
     const payloadArray = new Uint8Array(payload);
     uint8Array.set(payloadArray, udpOffset + udpHeaderLength);
 
-    // Optional: Calculate UDP Checksum (pseudo-header + udp header + payload)
-    // For simplicity, we can leave it as 0 in IPv4 which means "no checksum".
-    // Most clients accept this.
+    // Calculate UDP Checksum (Pseudo Header + UDP Header + Data)
+    // Pseudo Header: SrcIP(4) + DstIP(4) + Zero(1) + Protocol(1) + UDP Length(2)
+    const pseudoHeader = new Uint8Array(12);
+    const phView = new DataView(pseudoHeader.buffer);
+    phView.setUint32(0, PacketUtil.ipToInt(srcIp));
+    phView.setUint32(4, PacketUtil.ipToInt(dstIp));
+    phView.setUint8(8, 0);
+    phView.setUint8(9, 17);
+    phView.setUint16(10, udpHeaderLength + payload.byteLength);
+
+    let sum = 0;
+    // Sum Pseudo Header
+    for (let i = 0; i < pseudoHeader.length; i += 2) {
+      sum += (pseudoHeader[i] << 8) | pseudoHeader[i + 1];
+    }
+    // Sum UDP Header + Payload
+    const udpData = uint8Array.subarray(udpOffset);
+    for (let i = 0; i < udpData.length; i += 2) {
+      if (i + 1 < udpData.length) {
+        sum += (udpData[i] << 8) | udpData[i + 1];
+      } else {
+        sum += (udpData[i] << 8); // Pad with zero byte at end
+      }
+    }
+
+    while (sum > 0xFFFF) {
+      sum = (sum & 0xFFFF) + (sum >> 16);
+    }
+    const checksum = ~sum & 0xFFFF;
+    // If checksum is 0, it should be 0xFFFF (but 0 is allowed in UDP/IPv4 to mean 'no checksum')
+    // However, some strict implementations might require it. Let's stick to calculated value.
+    view.setUint16(udpOffset + 6, checksum === 0 ? 0xFFFF : checksum);
 
     return buffer;
   }

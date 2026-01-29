@@ -30,5 +30,8 @@ export const DEFAULT_DNS_LIST: DnsInfo[] = [
   new DnsInfo('114 DNS', '114.114.114.114', '114.114.115.115', true, DnsType.PURE),
   new DnsInfo('Google DNS', '8.8.8.8', '8.8.4.4', true, DnsType.PURE),
   new DnsInfo('Ali DNS', '223.5.5.5', '223.6.6.6', true, DnsType.PURE),
-  new DnsInfo('DNSPod', '119.29.29.29', '', true, DnsType.PURE)
+  new DnsInfo('DNSPod', '119.29.29.29', '', true, DnsType.PURE),
+  new DnsInfo('Cloudflare', '1.1.1.1', '1.0.0.1', true, DnsType.PURE),
+  new DnsInfo('Quad9', '9.9.9.9', '149.112.112.112', true, DnsType.PURE),
+  new DnsInfo('Baidu DNS', '180.76.76.76', '', true, DnsType.PURE)
 ];

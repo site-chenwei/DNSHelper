@@ -1,6 +1,6 @@
 
 import { DEFAULT_DNS_LIST, DnsInfo, DnsType } from '../model/DnsInfo';
-import { DnsService } from '../service/DnsService';
+import { DnsDataManager } from '../utils/DnsDataManager';
 import { promptAction, router } from '@kit.ArkUI';
 
 @Component
@@ -9,7 +9,7 @@ export default struct ConfigTab {
   @StorageProp('topSafeHeight') topSafeHeight: number = 0;
 
   async aboutToAppear() {
-    await DnsService.getInstance().getDnsList(getContext(this));
+    await DnsDataManager.getInstance().init(getContext(this));
   }
 
   @Builder
@@ -26,7 +26,7 @@ export default struct ConfigTab {
     .backgroundColor(Color.Red)
     .margin({ left: 10 })
     .onClick(async () => {
-      await DnsService.getInstance().removeDns(getContext(this), id);
+      await DnsDataManager.getInstance().removeDns(id);
       promptAction.showToast({ message: '删除成功' });
     })
   }
