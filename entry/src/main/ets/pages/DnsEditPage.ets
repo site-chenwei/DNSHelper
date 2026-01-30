@@ -13,10 +13,18 @@ interface DropdownOption {
 struct DnsEditPage {
   @State name: string = '';
   @State primaryDns: string = '';
-  @State selectedType: DnsType = DnsType.PURE;
+  @State selectedType: DnsType = DnsType.UDP;
   @State isEditMode: boolean = false;
   @State currentId: string = '';
   @StorageProp('topSafeHeight') topSafeHeight: number = 0;
+
+  isValidIp(ip: string): boolean {
+    if (this.selectedType === DnsType.DOH) {
+      return ip.startsWith('https://') || ip.startsWith('http://');
+    }
+    const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    return ipv4Regex.test(ip);
+  }
 
   async aboutToAppear() {
     DnsDataManager.getInstance().init(getContext(this));
@@ -29,7 +37,7 @@ struct DnsEditPage {
       if (dns) {
         this.name = dns.name;
         this.primaryDns = dns.primaryDns;
-        this.selectedType = dns.type || DnsType.PURE;
+        this.selectedType = dns.type || DnsType.UDP;
       }
     }
   }
@@ -85,6 +93,11 @@ struct DnsEditPage {
 
   async save() {
     if (this.name && this.primaryDns) {
+      if (!this.isValidIp(this.primaryDns)) {
+        promptAction.showToast({ message: 'DNS 格式不正确' });
+        return;
+      }
+
       if (this.isEditMode) {
         const dns = new DnsInfo(this.name, this.primaryDns, false, this.selectedType);
         dns.id = this.currentId; // 保持 ID 不变

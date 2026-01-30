@@ -5,13 +5,13 @@
         "name": "default",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "C:\\Users\\cw\\.ohos\\config\\default_DNSHelper_Hr8Pa6-QAwJzcY8zjnzlEagXVlZS7w77Va9uwXrRuA8=.cer",
+          "certpath": "C:\\Users\\Bill\\.ohos\\config\\default_DNSHelper_ePkTuMKtvAvku3qTtLUzvuM8K537tIUHxQQ8V5bMHTo=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001BEFC985BA6B46DBCAB3B076068356E428DF98C90D90655F4D0409B5BE484688EC0C4DBDD4AB75E2",
-          "profile": "C:\\Users\\cw\\.ohos\\config\\default_DNSHelper_Hr8Pa6-QAwJzcY8zjnzlEagXVlZS7w77Va9uwXrRuA8=.p7b",
+          "keyPassword": "0000001B8386F2CD7B7BE8F6EE8CF3EE22ED440460709A88A9AF91D1A52ADA2D4E6212C1375BADA5AF05D4",
+          "profile": "C:\\Users\\Bill\\.ohos\\config\\default_DNSHelper_ePkTuMKtvAvku3qTtLUzvuM8K537tIUHxQQ8V5bMHTo=.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "C:\\Users\\cw\\.ohos\\config\\default_DNSHelper_Hr8Pa6-QAwJzcY8zjnzlEagXVlZS7w77Va9uwXrRuA8=.p12",
-          "storePassword": "0000001B73B25221F7AC0997C1F825B23C650332FAC82A5EE27C24AAC59C15E24F2BE3D18E704F37C7DFA7"
+          "storeFile": "C:\\Users\\Bill\\.ohos\\config\\default_DNSHelper_ePkTuMKtvAvku3qTtLUzvuM8K537tIUHxQQ8V5bMHTo=.p12",
+          "storePassword": "0000001B475228AE84E77B761144CAF68749A66EF4C16B05FF63CC4FE417C6FE0FD6A2176CD9412776A259"
         }
       }
     ],

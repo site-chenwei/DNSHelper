@@ -12,7 +12,7 @@ export default struct DnsEditDialog {
   
   @State name: string = '';
   @State primaryDns: string = '';
-  @State selectedType: DnsType = DnsType.PURE;
+  @State selectedType: DnsType = DnsType.UDP;
 
   build() {
     Column() {

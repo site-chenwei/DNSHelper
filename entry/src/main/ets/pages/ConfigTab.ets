@@ -75,7 +75,7 @@ export default struct ConfigTab {
                     .margin({ left: 8 })
                 }
 
-                Text(item.type || DnsType.PURE)
+                Text(item.type || DnsType.UDP)
                   .fontSize($r('app.float.text_size_micro'))
                   .fontColor($r('app.color.text_secondary'))
                   .backgroundColor($r('app.color.badge_background'))

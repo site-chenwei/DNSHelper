@@ -3,8 +3,6 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { DnsDataManager } from '../utils/DnsDataManager';
 
-import { DnsCacheManager } from '../utils/DnsCacheManager';
-
 const DOMAIN = 0x0000;
 
 export default class EntryAbility extends UIAbility {
@@ -13,7 +11,6 @@ export default class EntryAbility extends UIAbility {
       this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
       // 初始化数据管理器 (持久化)
       DnsDataManager.getInstance().init(this.context);
-      DnsCacheManager.getInstance().init(this.context);
     } catch (err) {
       hilog.error(DOMAIN, 'testTag', 'Failed to set colorMode. Cause: %{public}s', JSON.stringify(err));
     }

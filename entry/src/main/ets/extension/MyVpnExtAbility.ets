@@ -1,10 +1,9 @@
 import { VpnExtensionAbility, vpnExtension } from '@kit.NetworkKit';
 import { Want } from '@kit.AbilityKit';
-import { socket } from '@kit.NetworkKit';
+import { socket, http } from '@kit.NetworkKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import fs from '@ohos.file.fs';
 import { PacketUtil } from '../utils/PacketUtil';
-import { DnsCacheManager } from '../utils/DnsCacheManager';
 import wifiManager from '@ohos.wifiManager';
 import connection from '@ohos.net.connection';
 
@@ -48,20 +47,15 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
     }
 
     try {
-      // 在 Extension 中也需要初始化缓存管理器
-      await DnsCacheManager.getInstance().init(this.context);
       this.vpnConnection = vpnExtension.createVpnConnection(this.context);
       console.info(TAG, 'VPN 连接已创建');
       const config: vpnExtension.VpnConfig = {
         addresses: [{
           address: { address: "10.1.10.1", family: 1 },
           prefixLength: 32
-        }, {
-          address: { address: "fd00::1", family: 2 },
-          prefixLength: 128
         }],
         mtu: 1400,
-        dnsAddresses: ["10.1.10.2", "fd00::2"], // 告诉系统：我有这些 DNS，请优先用我
+        dnsAddresses: ["10.1.10.2"], // 告诉系统：我有这些 DNS，请优先用我
         routes: [{
           interface: 'vpn-tun',
           destination: {
@@ -79,30 +73,13 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
           },
           hasGateway: false,
           isDefaultRoute: false
-        }, {
-          interface: 'vpn-tun',
-          destination: {
-            address: {
-              address: "fd00::2",
-              family: 2,
-              port: 53
-            },
-            prefixLength: 128
-          },
-          gateway: {
-            address: '::',
-            family: 2,
-            port: 0
-          },
-          hasGateway: false,
-          isDefaultRoute: false
         }],
         blockedApplications: ["site.chenwei.dns"]
       };
 
-      console.info(TAG, `Creating VPN interface with config: ${JSON.stringify(config)}`);
+      console.info(TAG, `创建 VPN 接口配置: ${JSON.stringify(config)}`);
       this.tunFd = await this.vpnConnection.create(config);
-      console.info(TAG, `VPN interface created, fd: ${this.tunFd}`);
+      console.info(TAG, `VPN 接口已创建, fd: ${this.tunFd}`);
 
       if (this.tunFd > 0) {
         this.isRunning = true;
@@ -111,7 +88,7 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
 
     } catch (err) {
       const error = err as BusinessError;
-      console.error(TAG, `Failed to start VPN: ${error.code} - ${error.message}`);
+      console.error(TAG, `启动 VPN 失败: ${error.code} - ${error.message}`);
       this.destroyVpn();
     }
   }
@@ -159,56 +136,16 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
       }
     }
 
-    // Prepare Relay Socket (UDP IPv6)
-    const relaySocketV6 = socket.constructUDPSocketInstance();
-    try {
-      await relaySocketV6.bind({ address: '::', port: 0, family: 2 });
-    } catch (e) {
-      console.error(TAG, 'Failed to bind IPv6 relay socket: ' + JSON.stringify(e));
-    }
+    // Prepare Relay Socket (UDP IPv6) - REMOVED
+
 
     const sessionMap = new Map<number, SessionInfo>();
 
     const handleResponse = (value: socket.SocketMessageInfo) => {
-      const respPayload = value.message;
-      if (respPayload.byteLength < 2) {
-        return;
-      }
-      const view = new DataView(respPayload);
-      const transId = view.getUint16(0);
-
-      const session = sessionMap.get(transId);
-      if (session) {
-        if (session.cacheKey) {
-          DnsCacheManager.getInstance().put(session.cacheKey, respPayload);
-        }
-
-        console.info(TAG, `Processing response for transId: ${transId}, isIpv6: ${session.isIpv6}`);
-
-        let ipPacket: ArrayBuffer;
-        if (session.isIpv6) {
-          ipPacket = PacketUtil.buildIpv6UdpPacket(
-            session.dstIp, session.srcIp, session.dstPort, session.srcPort, respPayload
-          );
-        } else {
-          ipPacket = PacketUtil.buildIpv4UdpPacket(
-            session.dstIp, session.srcIp, session.dstPort, session.srcPort, respPayload
-          );
-        }
-
-        if (this.tunFd > 0 && this.isRunning) {
-          fs.write(this.tunFd, ipPacket).catch((e: BusinessError) => {
-            if (String(e.code) !== '13900010') {
-              console.error(TAG, 'Write TUN failed: ' + JSON.stringify(e));
-            }
-          });
-        }
-        sessionMap.delete(transId);
-      }
+      this.processDnsResponse(value.message, sessionMap);
     };
 
     relaySocket.on('message', handleResponse);
-    relaySocketV6.on('message', handleResponse);
 
     const buffer = new ArrayBuffer(4096);
     let errorCount = 0;
@@ -224,17 +161,8 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
           if (ipv4 && ipv4.protocol === 17) { // UDP
             const udp = PacketUtil.parseUdp(ipv4.payload);
             if (udp && udp.dstPort === 53) {
-              this.handleDnsQuery(udp.payload, ipv4.srcIp, ipv4.dstIp, udp.srcPort, udp.dstPort, false, sessionMap,
-                relaySocket, relaySocketV6);
-            }
-          } else {
-            const ipv6 = PacketUtil.parseIpv6(packetData);
-            if (ipv6 && ipv6.nextHeader === 17) { // UDP
-              const udp = PacketUtil.parseUdp(ipv6.payload);
-              if (udp && udp.dstPort === 53) {
-                this.handleDnsQuery(udp.payload, ipv6.srcIp, ipv6.dstIp, udp.srcPort, udp.dstPort, true, sessionMap,
-                  relaySocket, relaySocketV6);
-              }
+              this.handleDnsQuery(udp.payload, ipv4.srcIp, ipv4.dstIp, udp.srcPort, udp.dstPort, sessionMap,
+                relaySocket);
             }
           }
         }
@@ -248,51 +176,77 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
   }
 
   private handleDnsQuery(dnsPayload: ArrayBuffer, srcIp: string, dstIp: string, srcPort: number, dstPort: number,
-    isIpv6: boolean, sessionMap: Map<number, SessionInfo>, socketV4: socket.UDPSocket, socketV6: socket.UDPSocket) {
+    sessionMap: Map<number, SessionInfo>, socketV4: socket.UDPSocket) {
     const view = new DataView(dnsPayload);
     const transId = view.getUint16(0);
-    const question = PacketUtil.parseDnsQuestion(dnsPayload);
-    let cacheKey = '';
-
-    if (question) {
-      cacheKey = DnsCacheManager.getInstance().getCacheKey(question.qname, question.qtype);
-      const cached = DnsCacheManager.getInstance().get(cacheKey);
-      if (cached) {
-        console.info(TAG, 'DNS Cache Hit');
-        const newPayload = PacketUtil.updateDnsTransactionId(cached, transId);
-        let ipPacket: ArrayBuffer;
-        if (isIpv6) {
-          ipPacket = PacketUtil.buildIpv6UdpPacket(dstIp, srcIp, dstPort, srcPort, newPayload);
-        } else {
-          ipPacket = PacketUtil.buildIpv4UdpPacket(dstIp, srcIp, dstPort, srcPort, newPayload);
-        }
-        fs.write(this.tunFd, ipPacket).catch(() => {
-        });
-        return;
-      }
-    }
 
     sessionMap.set(transId, {
       srcIp,
       srcPort,
       dstIp,
-      dstPort,
-      cacheKey,
-      isIpv6
+      dstPort
     });
 
-    this.currentDnsList.forEach(dnsIp => {
-      const isDnsIpv6 = dnsIp.includes(':');
-      const targetSocket = isDnsIpv6 ? socketV6 : socketV4;
-      const family = isDnsIpv6 ? 2 : 1;
+    this.currentDnsList.forEach(dnsTarget => {
+      if (dnsTarget.startsWith('http://') || dnsTarget.startsWith('https://')) {
+        this.sendDohQuery(dnsTarget, dnsPayload, sessionMap);
+      } else if (!dnsTarget.includes(':')) {
+        socketV4.send({
+          address: { address: dnsTarget, port: 53, family: 1 },
+          data: dnsPayload
+        }).catch((err: BusinessError) => {
+          // console.error(TAG, `Forward DNS failed: ${JSON.stringify(err)}`);
+        });
+      }
+    });
+  }
 
-      targetSocket.send({
-        address: { address: dnsIp, port: 53, family: family },
-        data: dnsPayload
-      }).catch((err: BusinessError) => {
-        // console.error(TAG, `Forward DNS failed: ${JSON.stringify(err)}`);
+  private async sendDohQuery(dohUrl: string, dnsPayload: ArrayBuffer, sessionMap: Map<number, SessionInfo>) {
+    try {
+      const httpRequest = http.createHttp();
+      const response = await httpRequest.request(dohUrl, {
+        method: http.RequestMethod.POST,
+        header: {
+          'Content-Type': 'application/dns-message',
+          'Accept': 'application/dns-message'
+        },
+        extraData: dnsPayload,
+        expectDataType: http.HttpDataType.ARRAY_BUFFER
       });
-    });
+
+      if (response.responseCode === 200 && response.result instanceof ArrayBuffer) {
+        this.processDnsResponse(response.result as ArrayBuffer, sessionMap);
+      }
+      httpRequest.destroy();
+    } catch (err) {
+      console.error(TAG, `DoH 查询失败: ${JSON.stringify(err)}`);
+    }
+  }
+
+  private processDnsResponse(respPayload: ArrayBuffer, sessionMap: Map<number, SessionInfo>) {
+    if (respPayload.byteLength < 2) {
+      return;
+    }
+    const view = new DataView(respPayload);
+    const transId = view.getUint16(0);
+
+    const session = sessionMap.get(transId);
+    if (session) {
+      console.info(TAG, `处理响应 transId: ${transId}`);
+
+      const ipPacket = PacketUtil.buildIpv4UdpPacket(
+        session.dstIp, session.srcIp, session.dstPort, session.srcPort, respPayload
+      );
+
+      if (this.tunFd > 0 && this.isRunning) {
+        fs.write(this.tunFd, ipPacket).catch((e: BusinessError) => {
+          if (String(e.code) !== '13900010') {
+            console.error(TAG, '写入 TUN 失败: ' + JSON.stringify(e));
+          }
+        });
+      }
+      sessionMap.delete(transId);
+    }
   }
 
   // Helper to get Physical IP for binding
@@ -337,6 +291,4 @@ interface SessionInfo {
   srcPort: number;
   dstIp: string;
   dstPort: number;
-  cacheKey: string;
-  isIpv6: boolean;
 }
