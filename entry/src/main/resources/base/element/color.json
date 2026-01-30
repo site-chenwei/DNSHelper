@@ -10,15 +10,15 @@
     },
     {
       "name": "text_primary",
-      "value": "#1A1A1A"
+      "value": "#1D2129"
     },
     {
       "name": "text_secondary",
-      "value": "#999999"
+      "value": "#86909C"
     },
     {
       "name": "icon_secondary",
-      "value": "#C7C7CC"
+      "value": "#C9CDD4"
     },
     {
       "name": "brand_color",
@@ -30,11 +30,11 @@
     },
     {
       "name": "status_inactive_bg",
-      "value": "#F2F2F7"
+      "value": "#F2F3F5"
     },
     {
       "name": "button_inactive_bg",
-      "value": "#E5E5EA"
+      "value": "#E5E6EB"
     },
     {
       "name": "card_background",
@@ -42,19 +42,19 @@
     },
     {
       "name": "card_shadow",
-      "value": "#1A000000"
+      "value": "#0D000000"
     },
     {
       "name": "page_grouped_background",
-      "value": "#F2F2F7"
+      "value": "#F7F8FA"
     },
     {
       "name": "badge_background",
-      "value": "#F2F2F7"
+      "value": "#F2F3F5"
     },
     {
       "name": "functional_red",
-      "value": "#FF3B30"
+      "value": "#F53F3F"
     },
     {
       "name": "divider_color",
@@ -62,7 +62,11 @@
     },
     {
       "name": "tab_bar_background",
-      "value": "#F7F7F7"
+      "value": "#FFFFFF"
+    },
+    {
+      "name": "brand_shadow_active",
+      "value": "#6611B882"
     }
   ]
 }

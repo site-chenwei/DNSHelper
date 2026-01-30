@@ -118,7 +118,10 @@ struct WaveView {
 @Component
 export default struct StartTab {
   @StorageProp('topSafeHeight') topSafeHeight: number = 0;
-  @StorageLink('isRunning') isRunning: boolean = false;
+  @StorageLink('isRunning') @Watch('onRunningChange') isRunning: boolean = false;
+  @StorageLink('vpnStartTime') vpnStartTime: number = 0;
+  @State durationStr: string = '00:00:00';
+  private timerId: number = -1;
   @StorageProp('currentDnsId') @Watch('updateCurrentDnsName') currentDnsId: string = '';
   @StorageLink('dnsList') @Watch('updateCurrentDnsName') dnsList: DnsInfo[] = [];
   @State currentDnsName: string = '请选择 DNS';
@@ -132,12 +135,59 @@ export default struct StartTab {
     // DnsDataManager 已经在 EntryAbility 中初始化，这里无需重复初始化
     this.updateCurrentDnsName();
     this.subscribeToDnsStats();
+    if (this.isRunning) {
+      this.startTimer();
+    }
   }
 
   aboutToDisappear() {
     if (this.subscriber) {
       commonEventManager.unsubscribe(this.subscriber);
     }
+    this.stopTimer();
+  }
+
+  onRunningChange() {
+    if (this.isRunning) {
+      if (this.vpnStartTime <= 0) {
+        this.vpnStartTime = Date.now();
+      }
+      this.startTimer();
+    } else {
+      this.stopTimer();
+      this.vpnStartTime = 0;
+    }
+  }
+
+  startTimer() {
+    this.stopTimer();
+    this.updateDuration();
+    this.timerId = setInterval(() => {
+      this.updateDuration();
+    }, 1000);
+  }
+
+  stopTimer() {
+    if (this.timerId !== -1) {
+      clearInterval(this.timerId);
+      this.timerId = -1;
+    }
+  }
+
+  updateDuration() {
+    if (this.vpnStartTime <= 0) {
+      this.durationStr = '00:00:00';
+      return;
+    }
+    const diff = Math.floor((Date.now() - this.vpnStartTime) / 1000);
+    if (diff < 0) {
+      this.durationStr = '00:00:00';
+      return;
+    }
+    const h = Math.floor(diff / 3600);
+    const m = Math.floor((diff % 3600) / 60);
+    const s = diff % 60;
+    this.durationStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   }
 
   subscribeToDnsStats() {
@@ -217,7 +267,9 @@ export default struct StartTab {
       bundleName: 'site.chenwei.dns',
       abilityName: 'MyVpnExtAbility',
       parameters: {
-        dnsList: dnsIps
+        dnsList: dnsIps,
+        dnsType: selectedDns ? selectedDns.type : 'UDP',
+        preferHttp3: selectedDns ? (selectedDns.preferHttp3 || false) : false
       }
     };
 
@@ -285,16 +337,16 @@ export default struct StartTab {
   build() {
     Column() {
       // 顶部标题区域
-      Stack({ alignContent: Alignment.Center }) {
-        Text('DNS Helper')
-          .fontSize($r('app.float.text_size_title'))
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary'))
-          .textAlign(TextAlign.Center)
-      }
-      .width('100%')
-      .height(44)
-      .margin({ top: 10, bottom: 10 })
+      // Stack({ alignContent: Alignment.Center }) {
+      //   Text('DNS Helper')
+      //     .fontSize($r('app.float.text_size_title'))
+      //     .fontWeight(FontWeight.Bold)
+      //     .fontColor($r('app.color.text_primary'))
+      //     .textAlign(TextAlign.Center)
+      // }
+      // .width('100%')
+      // .height(44)
+      // .margin({ top: 10, bottom: 10 })
 
       // 中间大按钮区域
       Column() {
@@ -315,7 +367,7 @@ export default struct StartTab {
           .height(180)
           .borderRadius(90)
           .backgroundColor(this.isRunning ? $r('app.color.brand_color') : $r('app.color.button_inactive_bg'))
-          .shadow({ radius: 20, color: this.isRunning ? 'rgba(17, 184, 130, 0.4)' : $r('app.color.card_shadow'), offsetY: 10 })
+          .shadow({ radius: 20, color: this.isRunning ? $r('app.color.brand_shadow_active') : $r('app.color.card_shadow'), offsetY: 10 })
           .scale({ x: this.buttonScale, y: this.buttonScale })
           .onClick(() => {
             this.toggleRunning();
@@ -331,7 +383,7 @@ export default struct StartTab {
           .fontWeight(FontWeight.Medium)
           .margin({ top: 30 })
         
-        Text(this.isRunning ? 'VPN 服务运行中' : '未连接')
+        Text(this.isRunning ? `已运行 ${this.durationStr}` : '未连接')
           .fontSize($r('app.float.text_size_small'))
           .fontColor($r('app.color.text_secondary'))
           .margin({ top: 8 })
@@ -375,7 +427,7 @@ export default struct StartTab {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor($r('app.color.page_grouped_background'))
+    .backgroundColor($r('app.color.start_window_background'))
     .padding({ top: this.topSafeHeight })
   }
 }

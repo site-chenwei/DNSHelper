@@ -1,12 +1,16 @@
 import { VpnExtensionAbility, vpnExtension } from '@kit.NetworkKit';
 import { Want } from '@kit.AbilityKit';
 import { socket, http } from '@kit.NetworkKit';
+import { rcp } from '@kit.RemoteCommunicationKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import fs from '@ohos.file.fs';
 import { PacketUtil } from '../utils/PacketUtil';
 import wifiManager from '@ohos.wifiManager';
 import connection from '@ohos.net.connection';
 import commonEventManager from '@ohos.commonEventManager';
+
+import { DnsType } from '../model/DnsInfo';
+import { util } from '@kit.ArkTS';
 
 const TAG = '[MyVpnExtAbility]';
 
@@ -15,6 +19,8 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
   private tunFd: number = -1;
   private isRunning: boolean = false;
   private currentDnsList: string[] = ['223.5.5.5', '223.6.6.6'];
+  private currentDnsType: string = DnsType.UDP;
+  private preferHttp3: boolean = false;
   private dnsRequestCount: number = 0;
 
   onCreate(want: Want) {
@@ -28,10 +34,18 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
   }
 
   private handleWant(want: Want) {
-    if (want.parameters && want.parameters['dnsList']) {
-      const dnsList = want.parameters['dnsList'] as string[];
-      if (dnsList && dnsList.length > 0) {
-        this.currentDnsList = dnsList;
+    if (want.parameters) {
+      if (want.parameters['dnsList']) {
+        const dnsList = want.parameters['dnsList'] as string[];
+        if (dnsList && dnsList.length > 0) {
+          this.currentDnsList = dnsList;
+        }
+      }
+      if (want.parameters['dnsType']) {
+        this.currentDnsType = want.parameters['dnsType'] as string;
+      }
+      if (want.parameters['preferHttp3']) {
+        this.preferHttp3 = want.parameters['preferHttp3'] as boolean;
       }
     }
     this.startVpn();
@@ -185,21 +199,108 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
     });
 
     this.currentDnsList.forEach(dnsTarget => {
-      if (dnsTarget.startsWith('http://') || dnsTarget.startsWith('https://')) {
+      // Prioritize explicit type, but keep backward compatibility for URL detection
+      if (this.currentDnsType === DnsType.DOH || dnsTarget.startsWith('http://') || dnsTarget.startsWith('https://')) {
         this.sendDohQuery(dnsTarget, dnsPayload, sessionMap);
-      } else if (!dnsTarget.includes(':')) {
-        socketV4.send({
-          address: { address: dnsTarget, port: 53, family: 1 },
-          data: dnsPayload
-        }).catch((err: BusinessError) => {
-          // console.error(TAG, `Forward DNS failed: ${JSON.stringify(err)}`);
-        });
+      } else if (this.currentDnsType === DnsType.DOT) {
+        this.sendDotQuery(dnsTarget, dnsPayload, sessionMap);
+      } else if (this.currentDnsType === DnsType.DOQ) {
+        this.sendDoqQuery(dnsTarget, dnsPayload, sessionMap);
+      } else {
+        // UDP
+        if (!dnsTarget.includes(':')) {
+          socketV4.send({
+            address: { address: dnsTarget, port: 53, family: 1 },
+            data: dnsPayload
+          }).catch((err: BusinessError) => {
+            // console.error(TAG, `Forward DNS failed: ${JSON.stringify(err)}`);
+          });
+        }
       }
     });
   }
 
+  private async sendDotQuery(dnsTarget: string, dnsPayload: ArrayBuffer, sessionMap: Map<number, SessionInfo>) {
+    let tlsSocket: socket.TLSSocket | undefined;
+    try {
+      tlsSocket = socket.constructTLSSocketInstance();
+      const len = dnsPayload.byteLength;
+      const tcpPayload = new Uint8Array(2 + len);
+      const view = new DataView(tcpPayload.buffer);
+      view.setUint16(0, len, false);
+      tcpPayload.set(new Uint8Array(dnsPayload), 2);
+
+      const connectOptions: socket.TLSConnectOptions = {
+        address: {
+          address: dnsTarget,
+          port: 853,
+          family: 1
+        },
+        secureOptions: {
+          // verifyRemote: false // Skip verification for simplicity/compatibility
+        }
+      };
+
+      tlsSocket.on('message', (value) => {
+        // Simple handling: assume full response in one packet
+        if (value.message.byteLength > 2) {
+           const respPayload = value.message.slice(2);
+           this.processDnsResponse(respPayload, sessionMap);
+        }
+        tlsSocket?.close();
+      });
+      
+      tlsSocket.on('error', (err) => {
+        console.error(TAG, `DOT Socket error: ${JSON.stringify(err)}`);
+        tlsSocket?.close();
+      });
+
+      await tlsSocket.connect(connectOptions);
+      await tlsSocket.send(tcpPayload.buffer);
+    } catch (e) {
+      console.error(TAG, `DOT failed: ${JSON.stringify(e)}`);
+      if (tlsSocket) {
+          tlsSocket.close();
+      }
+    }
+  }
+
+  private async sendDoqQuery(dnsTarget: string, dnsPayload: ArrayBuffer, sessionMap: Map<number, SessionInfo>) {
+     console.error(TAG, 'DOQ not supported yet');
+  }
+
   private async sendDohQuery(dohUrl: string, dnsPayload: ArrayBuffer, sessionMap: Map<number, SessionInfo>) {
     try {
+      // 如果启用 HTTP/3 优先，使用 rcp
+      if (this.preferHttp3) {
+        const session = rcp.createSession();
+        const request = new rcp.Request(dohUrl, 'POST');
+        request.content = dnsPayload;
+        request.headers = {
+          'content-type': 'application/dns-message',
+          'accept': 'application/dns-message'
+        };
+        
+        // rcp 会根据服务端支持情况自动协商 HTTP/3 (QUIC)
+        const response = await session.fetch(request);
+
+        if (response.statusCode === 200 && response.body) {
+           let resultBuffer: ArrayBuffer;
+           if (typeof response.body === 'string') {
+                console.warn(TAG, 'DoH response is string, unexpected');
+                return;
+           } else {
+                resultBuffer = response.body as ArrayBuffer;
+           }
+           this.processDnsResponse(resultBuffer, sessionMap);
+        } else {
+           console.error(TAG, `DoH (rcp) failed: ${response.statusCode}`);
+        }
+        session.close();
+        return;
+      }
+
+      // 否则使用默认 http 模块 (HTTP/1.1 or HTTP/2)
       const httpRequest = http.createHttp();
       const response = await httpRequest.request(dohUrl, {
         method: http.RequestMethod.POST,

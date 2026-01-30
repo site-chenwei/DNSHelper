@@ -14,15 +14,19 @@
     },
     {
       "name": "text_secondary",
-      "value": "#666666"
+      "value": "#8C8C8C"
+    },
+    {
+      "name": "icon_secondary",
+      "value": "#555555"
     },
     {
       "name": "brand_color",
-      "value": "#0A84FF"
+      "value": "#11B882"
     },
     {
       "name": "status_active_bg",
-      "value": "#1A3050"
+      "value": "#0F3325"
     },
     {
       "name": "status_inactive_bg",
@@ -59,6 +63,10 @@
     {
       "name": "tab_bar_background",
       "value": "#111111"
+    },
+    {
+      "name": "brand_shadow_active",
+      "value": "#6611B882"
     }
   ]
 }

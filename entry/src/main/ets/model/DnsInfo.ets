@@ -2,8 +2,7 @@ export enum DnsType {
   UDP = 'UDP',
   DOT = 'DOT',
   DOH = 'DOH',
-  DOQ = 'DOQ',
-  DOH3 = 'DOH3'
+  DOQ = 'DOQ'
 }
 
 export class DnsInfo {
@@ -12,13 +11,15 @@ export class DnsInfo {
   primaryDns: string;
   isDefault: boolean;
   type: DnsType;
+  preferHttp3: boolean; // 新增字段：是否优先使用 HTTP/3
 
-  constructor(name: string, primaryDns: string, isDefault: boolean = false, type: DnsType = DnsType.UDP, id?: string) {
+  constructor(name: string, primaryDns: string, isDefault: boolean = false, type: DnsType = DnsType.UDP, id?: string, preferHttp3: boolean = false) {
     this.id = id ? id : (Math.random().toString(36).slice(2, 9) + Date.now().toString(36));
     this.name = name;
     this.primaryDns = primaryDns;
     this.isDefault = isDefault;
     this.type = type;
+    this.preferHttp3 = preferHttp3;
   }
 }
 
