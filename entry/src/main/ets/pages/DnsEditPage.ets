@@ -120,16 +120,13 @@ struct DnsEditPage {
       Stack({ alignContent: Alignment.Center }) {
         // 返回按钮
         Row() {
-          Path()
-            .commands('M14 6 L8 12 L14 18')
-            .fill(Color.Transparent)
-            .stroke($r('app.color.text_primary'))
-            .strokeWidth(2)
-            .width(12)
+          Image($r('app.media.ic_back'))
+            .width(24)
             .height(24)
+            .fillColor($r('app.color.icon_secondary'))
         }
         .width(56)
-        .height(56)
+        .height('100%')
         .justifyContent(FlexAlign.Center)
         .alignItems(VerticalAlign.Center)
         .onClick(() => {

@@ -6,6 +6,7 @@ import fs from '@ohos.file.fs';
 import { PacketUtil } from '../utils/PacketUtil';
 import wifiManager from '@ohos.wifiManager';
 import connection from '@ohos.net.connection';
+import commonEventManager from '@ohos.commonEventManager';
 
 const TAG = '[MyVpnExtAbility]';
 
@@ -14,6 +15,7 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
   private tunFd: number = -1;
   private isRunning: boolean = false;
   private currentDnsList: string[] = ['223.5.5.5', '223.6.6.6'];
+  private dnsRequestCount: number = 0;
 
   onCreate(want: Want) {
     console.info(TAG, 'onCreate');
@@ -52,25 +54,16 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
       const config: vpnExtension.VpnConfig = {
         addresses: [{
           address: { address: "10.1.10.1", family: 1 },
-          prefixLength: 32
+          prefixLength: 24
         }],
-        mtu: 1400,
         dnsAddresses: ["10.1.10.2"], // 告诉系统：我有这些 DNS，请优先用我
         routes: [{
           interface: 'vpn-tun',
           destination: {
-            address: {
-              address: "10.1.10.2",
-              family: 1,
-              port: 53
-            },
+            address: { address: "10.1.10.2", family: 1 },
             prefixLength: 32
           },
-          gateway: {
-            address: '0.0.0.0',
-            family: 1,
-            port: 0
-          },
+          gateway: { address: '0.0.0.0' },
           hasGateway: false,
           isDefaultRoute: false
         }],
@@ -180,6 +173,10 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
     const view = new DataView(dnsPayload);
     const transId = view.getUint16(0);
 
+    // 统计 DNS 请求
+    this.dnsRequestCount++;
+    this.publishDnsCount();
+
     sessionMap.set(transId, {
       srcIp,
       srcPort,
@@ -247,6 +244,21 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
       }
       sessionMap.delete(transId);
     }
+  }
+
+  private publishDnsCount() {
+    // 简单的限流，防止频繁发送事件，实际生产中可以按时间或数量聚合
+    // 但为了演示实时性，这里每次都发
+    const options: commonEventManager.CommonEventPublishData = {
+      parameters: {
+        'count': this.dnsRequestCount
+      }
+    };
+    commonEventManager.publish('site.chenwei.dns.event.DNS_COUNT_UPDATE', options, (err) => {
+      if (err) {
+        // console.error(TAG, 'Publish DNS count failed');
+      }
+    });
   }
 
   // Helper to get Physical IP for binding

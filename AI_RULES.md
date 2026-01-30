@@ -98,3 +98,22 @@
   - **接口先行**: 核心业务模块遵循 Interface-First 设计。
   - **分层架构**: 严格分离 UI 展示与业务逻辑 (Service/ViewModel)。
   - **注释**: 必须使用中文，简洁明了。
+
+---
+
+## 5. 高级网络与 VPN 开发经验 (Network & VPN Experience)
+*HarmonyOS & Network Programming Best Practices*
+
+- **无服务器透明代理 (Serverless Transparent Proxy)**:
+  - 实现模式：TUN 接口作为流量入口，应用层拦截 IP 包后，直接通过物理网卡 Socket (UDP/TCP) 发送数据，收到回包后伪造 IP 头写回 TUN。
+  - 核心优势：无需真实 VPN 服务器，实现本地流量劫持与修改。
+
+- **DNS 劫持与转发**:
+  - **Split Tunneling**: 结合子网掩码 (如 /24) 和公网 DNS (114.114.114.114) 伪装，引导系统流量进入 TUN。
+  - **Session 竞争**: 向多个 DNS 并发查询时，只需处理第一个回包。日志中出现 "No session found" 为正常现象（后续回包被忽略）。
+  - **关键点**: 修改包内容后必须重新计算 **UDP 校验和**，否则会被系统丢弃。
+
+- **HarmonyOS 避坑指南**:
+  - **Native vs ArkTS**: 高性能转发推荐 C++ Native (libentry.so)；纯 ArkTS 适合轻量级任务，但需手动处理底层 IP 协议，性能受限。
+  - **IP 字节序**: `wifiManager` 返回的 IP 可能是 Little Endian (反序)，解析时需注意检查和反转。
+  - **VPN 路由配置**: `VpnConfig.routes` 不应包含 `addresses` 已覆盖的子网 IP，否则会导致 `Parameter error (401)`。

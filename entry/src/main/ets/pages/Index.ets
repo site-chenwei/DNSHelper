@@ -6,9 +6,13 @@ import { window } from '@kit.ArkUI';
 @Entry
 @Component
 struct Index {
-  @State currentIndex: number = 0;
+  @State @Watch('onIndexChange') currentIndex: number = 0;
   @State bottomSafeHeight: number = 0;
   private controller: TabsController = new TabsController();
+
+  onIndexChange() {
+    this.controller.changeIndex(this.currentIndex);
+  }
 
   aboutToAppear(): void {
     window.getLastWindow(getContext(this)).then(currentWindow => {
@@ -34,6 +38,7 @@ struct Index {
       Image(this.currentIndex === targetIndex ? selectedImg : normalImg)
         .size({ width: 24, height: 24 })
         .objectFit(ImageFit.Contain)
+        .fillColor(this.currentIndex === targetIndex ? $r('app.color.brand_color') : $r('app.color.text_secondary'))
       Text(title)
         .fontColor(this.currentIndex === targetIndex ? $r('app.color.brand_color') : $r('app.color.text_secondary'))
         .fontSize($r('app.float.text_size_small'))
@@ -55,19 +60,19 @@ struct Index {
     Column() {
       Tabs({ barPosition: BarPosition.End, controller: this.controller }) {
         TabContent() {
-          StartTab()
+          StartTab({ currentIndex: this.currentIndex })
         }
-        .tabBar(this.TabBuilder('启动', 0, $r('app.media.startIcon'), $r('app.media.startIcon')))
+        .tabBar(this.TabBuilder('启动', 0, $r('app.media.ic_home_filled'), $r('app.media.ic_home')))
 
         TabContent() {
           ConfigTab()
         }
-        .tabBar(this.TabBuilder('配置', 1, $r('app.media.startIcon'), $r('app.media.startIcon')))
+        .tabBar(this.TabBuilder('DNS', 1, $r('app.media.ic_dns_filled'), $r('app.media.ic_dns')))
 
         TabContent() {
           SettingsTab()
         }
-        .tabBar(this.TabBuilder('设置', 2, $r('app.media.startIcon'), $r('app.media.startIcon')))
+        .tabBar(this.TabBuilder('设置', 2, $r('app.media.ic_settings_filled'), $r('app.media.ic_settings')))
       }
       .scrollable(false)
       .barMode(BarMode.Fixed)

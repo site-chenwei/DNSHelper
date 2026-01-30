@@ -17,12 +17,16 @@
       "value": "#999999"
     },
     {
+      "name": "icon_secondary",
+      "value": "#C7C7CC"
+    },
+    {
       "name": "brand_color",
-      "value": "#007DFF"
+      "value": "#11B882"
     },
     {
       "name": "status_active_bg",
-      "value": "#E5F2FF"
+      "value": "#E0F7F0"
     },
     {
       "name": "status_inactive_bg",

@@ -3,6 +3,7 @@ import { DnsDataManager } from '../utils/DnsDataManager';
 import common from '@ohos.app.ability.common';
 import { vpnExtension } from '@kit.NetworkKit';
 import { Want } from '@kit.AbilityKit';
+import commonEventManager from '@ohos.commonEventManager';
 
 @Component
 struct SettingsItem {
@@ -25,14 +26,10 @@ struct SettingsItem {
         .margin({ right: 4 })
 
       if (this.showArrow) {
-        Path()
-          .commands('M10 6 L16 12 L10 18') // Simple arrow
-          .fill(Color.Transparent)
-          .stroke($r('app.color.text_secondary')) // Use secondary text color
-          .strokeWidth(2)
-          .width(12)
+        Image($r('app.media.ic_arrow_right'))
+          .width(24)
           .height(24)
-          .opacity(0.3)
+          .fillColor($r('app.color.icon_secondary'))
       }
     }
     .width('100%')
@@ -46,6 +43,79 @@ struct SettingsItem {
 }
 
 @Component
+struct WaveView {
+  @State waveScale1: number = 1;
+  @State waveOpacity1: number = 0;
+  @State waveScale2: number = 1;
+  @State waveOpacity2: number = 0;
+  private animationTimeoutId: number = -1;
+
+  aboutToAppear() {
+    this.startWaveAnimation();
+  }
+
+  aboutToDisappear() {
+    if (this.animationTimeoutId !== -1) {
+      clearTimeout(this.animationTimeoutId);
+      this.animationTimeoutId = -1;
+    }
+  }
+
+  startWaveAnimation() {
+    // 初始状态
+    this.waveScale1 = 1;
+    this.waveOpacity1 = 0.4;
+    this.waveScale2 = 1;
+    this.waveOpacity2 = 0.4;
+    
+    // 第一圈波纹
+    animateTo({
+      duration: 3000,
+      curve: Curve.EaseOut,
+      iterations: -1,
+      playMode: PlayMode.Normal
+    }, () => {
+      this.waveScale1 = 1.35;
+      this.waveOpacity1 = 0;
+    })
+
+    // 第二圈波纹，延迟1.5秒启动
+    this.animationTimeoutId = setTimeout(() => {
+      animateTo({
+        duration: 3000,
+        curve: Curve.EaseOut,
+        iterations: -1,
+        playMode: PlayMode.Normal
+      }, () => {
+        this.waveScale2 = 1.35;
+        this.waveOpacity2 = 0;
+      })
+    }, 1500)
+  }
+
+  build() {
+    Stack() {
+      Circle()
+        .width(180)
+        .height(180)
+        .fill($r('app.color.brand_color'))
+        .scale({ x: this.waveScale1, y: this.waveScale1 })
+        .opacity(this.waveOpacity1)
+
+      Circle()
+        .width(180)
+        .height(180)
+        .fill($r('app.color.brand_color'))
+        .scale({ x: this.waveScale2, y: this.waveScale2 })
+        .opacity(this.waveOpacity2)
+    }
+    .width('100%')
+    .height('100%')
+    .alignContent(Alignment.Center)
+  }
+}
+
+@Component
 export default struct StartTab {
   @StorageProp('topSafeHeight') topSafeHeight: number = 0;
   @StorageLink('isRunning') isRunning: boolean = false;
@@ -53,13 +123,44 @@ export default struct StartTab {
   @StorageLink('dnsList') @Watch('updateCurrentDnsName') dnsList: DnsInfo[] = [];
   @State currentDnsName: string = '请选择 DNS';
   @State buttonScale: number = 1;
+  @State dnsCount: number = 0;
+  
+  private subscriber: commonEventManager.CommonEventSubscriber | null = null;
+  @Link currentIndex: number;
 
   aboutToAppear() {
     // DnsDataManager 已经在 EntryAbility 中初始化，这里无需重复初始化
     this.updateCurrentDnsName();
+    this.subscribeToDnsStats();
   }
 
   aboutToDisappear() {
+    if (this.subscriber) {
+      commonEventManager.unsubscribe(this.subscriber);
+    }
+  }
+
+  subscribeToDnsStats() {
+    const subscribeInfo: commonEventManager.CommonEventSubscribeInfo = {
+      events: ['site.chenwei.dns.event.DNS_COUNT_UPDATE']
+    };
+    commonEventManager.createSubscriber(subscribeInfo, (err, subscriber) => {
+      if (err) {
+        console.error(`Create subscriber failed: ${JSON.stringify(err)}`);
+        return;
+      }
+      this.subscriber = subscriber;
+      commonEventManager.subscribe(subscriber, (err, data) => {
+        if (err) {
+          console.error(`Subscribe failed: ${JSON.stringify(err)}`);
+          return;
+        }
+        if (data.event === 'site.chenwei.dns.event.DNS_COUNT_UPDATE') {
+          const count = data.parameters ? data.parameters['count'] as number : 0;
+          this.dnsCount = count;
+        }
+      });
+    });
   }
 
   updateCurrentDnsName() {
@@ -85,15 +186,17 @@ export default struct StartTab {
       }
     }
 
-    // 简单的缩放动画效果
-    animateTo({ duration: 100, curve: Curve.EaseOut }, () => {
-      this.buttonScale = 0.9;
+    // 弹性缩放动画
+    animateTo({ duration: 300, curve: Curve.Friction }, () => {
+      this.buttonScale = 0.85;
     });
     setTimeout(() => {
-      animateTo({ duration: 100, curve: Curve.EaseOut }, () => {
+      // Curve.Spring 不是枚举值，如果需要弹簧效果，建议使用 FastOutSlowIn 或 cubicBezier 自定义
+      // 或者使用 interpolatingSpring 物理动画，但这里为了兼容性使用 FastOutSlowIn 模拟回弹
+      animateTo({ duration: 300, curve: Curve.FastOutSlowIn }, () => {
         this.buttonScale = 1;
       });
-    }, 100);
+    }, 150);
 
     if (this.isRunning) {
       await this.stopVpn();
@@ -195,21 +298,32 @@ export default struct StartTab {
 
       // 中间大按钮区域
       Column() {
-        Button() {
-          Image(this.isRunning ? $r('app.media.startIcon') : $r('app.media.startIcon')) 
-            .width(80)
-            .height(80)
-            .fillColor(Color.White)
+        Stack({ alignContent: Alignment.Center }) {
+          // 呼吸波纹层 - 使用条件渲染控制挂载/卸载
+          if (this.isRunning) {
+            WaveView()
+              .transition(TransitionEffect.OPACITY.animation({ duration: 300 }))
+          }
+          
+          Button() {
+            Image($r('app.media.ic_power')) 
+              .width(80)
+              .height(80)
+              .fillColor(Color.White)
+          }
+          .width(180)
+          .height(180)
+          .borderRadius(90)
+          .backgroundColor(this.isRunning ? $r('app.color.brand_color') : $r('app.color.button_inactive_bg'))
+          .shadow({ radius: 20, color: this.isRunning ? 'rgba(17, 184, 130, 0.4)' : $r('app.color.card_shadow'), offsetY: 10 })
+          .scale({ x: this.buttonScale, y: this.buttonScale })
+          .onClick(() => {
+            this.toggleRunning();
+          })
         }
-        .width(180)
-        .height(180)
-        .borderRadius(90)
-        .backgroundColor(this.isRunning ? $r('app.color.brand_color') : $r('app.color.button_inactive_bg'))
-        .shadow({ radius: 20, color: this.isRunning ? 'rgba(0,122,255,0.4)' : $r('app.color.card_shadow'), offsetY: 10 })
-        .scale({ x: this.buttonScale, y: this.buttonScale })
-        .onClick(() => {
-          this.toggleRunning();
-        })
+        .width(260) // 给波纹扩散留出空间
+        .height(260)
+        .alignContent(Alignment.Center)
 
         Text(this.isRunning ? '已保护' : '点击启动')
           .fontSize($r('app.float.text_size_sub_title'))
@@ -231,13 +345,23 @@ export default struct StartTab {
           ListItem() {
             Column() {
               SettingsItem({
-                title: '当前策略',
+                title: 'DNS 服务',
                 value: this.currentDnsName,
                 showArrow: true,
                 onClickHandler: () => {
-                  this.showDnsSelector();
+                  this.currentIndex = 1; // 切换到 DNS Tab
                 }
               })
+              
+              if (this.isRunning) {
+                Divider().color($r('app.color.divider_color')).strokeWidth(0.5).margin({ left: 16, right: 16 })
+
+                SettingsItem({
+                  title: '已处理请求',
+                  value: this.dnsCount.toString(),
+                  showArrow: false
+                })
+              }
             }
             .backgroundColor($r('app.color.card_background'))
             .borderRadius(12)
