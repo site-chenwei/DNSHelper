@@ -26,9 +26,9 @@
         "name": "EntryAbility",
         "srcEntry": "./ets/entryability/EntryAbility.ets",
         "description": "$string:EntryAbility_desc",
-        "icon": "$media:layered_image",
+        "icon": "$media:icon_modern",
         "label": "$string:EntryAbility_label",
-        "startWindowIcon": "$media:startIcon",
+        "startWindowIcon": "$media:icon_modern",
         "startWindowBackground": "$color:start_window_background",
         "exported": true,
         "skills": [
@@ -50,7 +50,7 @@
         "type": "vpn",
         "exported": true,
         "description": "$string:EntryAbility_desc",
-        "icon": "$media:layered_image",
+        "icon": "$media:icon_modern",
         "label": "$string:EntryAbility_label"
       },
       {
