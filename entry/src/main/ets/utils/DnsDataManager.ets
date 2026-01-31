@@ -1,4 +1,4 @@
-import { DnsInfo, DEFAULT_DNS_LIST } from '../model/DnsInfo';
+import { DnsInfo, DEFAULT_DNS_LIST, DEFAULT_BACKUP_DNS_LIST } from '../model/DnsInfo';
 import common from '@ohos.app.ability.common';
 import dataPreferences from '@ohos.data.preferences';
 
@@ -61,6 +61,43 @@ export class DnsDataManager {
       this.saveCurrentIdToPrefs(currentId);
     }
     AppStorage.setOrCreate('currentDnsId', currentId);
+
+    // 加载备用 DNS 列表
+    let backupDnsList: DnsInfo[] = [];
+    try {
+      const jsonStr = await this.preferences.get('saved_backup_dns_list', '') as string;
+      if (jsonStr) {
+        backupDnsList = JSON.parse(jsonStr) as DnsInfo[];
+      }
+    } catch (e) {
+      console.error('Failed to parse backup dns list', JSON.stringify(e));
+    }
+
+    // 确保默认备用 DNS 存在且位于首位
+    const defaultBackup = DEFAULT_BACKUP_DNS_LIST[0];
+    const existsIndex = backupDnsList.findIndex(d => d.id === defaultBackup.id);
+    if (existsIndex === -1) {
+      backupDnsList.unshift(defaultBackup);
+      this.saveBackupDnsListToPrefs(backupDnsList);
+    }
+    
+    AppStorage.setOrCreate('backupDnsList', backupDnsList);
+
+    // 加载当前选中的备用 DNS ID
+    let currentBackupId = '';
+    try {
+      currentBackupId = await this.preferences.get('saved_backup_dns_id', '') as string;
+    } catch (e) {
+      console.error('Failed to load current backup id', JSON.stringify(e));
+    }
+
+    // 验证 ID 有效性，如果无效且列表不为空，默认选中第一个（通常是阿里DNS）
+    const isBackupValid = currentBackupId && backupDnsList.some(d => d.id === currentBackupId);
+    if (!isBackupValid && backupDnsList.length > 0) {
+      currentBackupId = backupDnsList[0].id;
+      this.saveCurrentBackupIdToPrefs(currentBackupId);
+    }
+    AppStorage.setOrCreate('currentBackupDnsId', currentBackupId);
   }
 
   private async saveDnsListToPrefs(list: DnsInfo[]) {
@@ -80,6 +117,16 @@ export class DnsDataManager {
       await this.preferences.flush();
     } catch (e) {
       console.error('Failed to save current id', JSON.stringify(e));
+    }
+  }
+
+  private async saveBackupDnsListToPrefs(list: DnsInfo[]) {
+    if (!this.preferences) return;
+    try {
+      await this.preferences.put('saved_backup_dns_list', JSON.stringify(list));
+      await this.preferences.flush();
+    } catch (e) {
+      console.error('Failed to save backup dns list', JSON.stringify(e));
     }
   }
 
@@ -124,5 +171,58 @@ export class DnsDataManager {
   async setCurrentDnsId(id: string) {
       AppStorage.setOrCreate('currentDnsId', id);
       await this.saveCurrentIdToPrefs(id);
+  }
+
+  private async saveCurrentBackupIdToPrefs(id: string) {
+    if (!this.preferences) return;
+    try {
+      await this.preferences.put('saved_backup_dns_id', id);
+      await this.preferences.flush();
+    } catch (e) {
+      console.error('Failed to save current backup id', JSON.stringify(e));
+    }
+  }
+
+  async setCurrentBackupDnsId(id: string) {
+    AppStorage.setOrCreate('currentBackupDnsId', id);
+    await this.saveCurrentBackupIdToPrefs(id);
+  }
+
+  getBackupDnsList(): DnsInfo[] {
+    return AppStorage.get<DnsInfo[]>('backupDnsList') || [];
+  }
+
+  async addBackupDns(dns: DnsInfo) {
+    const list = this.getBackupDnsList();
+    list.push(dns);
+    AppStorage.setOrCreate('backupDnsList', list);
+    await this.saveBackupDnsListToPrefs(list);
+  }
+
+  async updateBackupDns(dns: DnsInfo) {
+    let list = this.getBackupDnsList();
+    const index = list.findIndex(item => item.id === dns.id);
+    if (index !== -1) {
+      list[index] = dns;
+      AppStorage.setOrCreate('backupDnsList', list);
+      await this.saveBackupDnsListToPrefs(list);
+    }
+  }
+
+  async removeBackupDns(id: string) {
+    let list = this.getBackupDnsList();
+    list = list.filter(item => item.id !== id);
+    AppStorage.setOrCreate('backupDnsList', list);
+    await this.saveBackupDnsListToPrefs(list);
+
+    // 如果删除了当前选中的备用 DNS，尝试切换到第一个
+    const currentBackupId = AppStorage.get<string>('currentBackupDnsId');
+    if (currentBackupId === id) {
+      if (list.length > 0) {
+        await this.setCurrentBackupDnsId(list[0].id);
+      } else {
+        await this.setCurrentBackupDnsId('');
+      }
+    }
   }
 }

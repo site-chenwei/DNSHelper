@@ -2,11 +2,8 @@ import { DnsInfo, DnsType } from '../model/DnsInfo';
 import { router } from '@kit.ArkUI';
 import { DnsDataManager } from '../utils/DnsDataManager';
 import { promptAction } from '@kit.ArkUI';
-
-interface DropdownOption {
-  value: ResourceStr;
-  icon?: ResourceStr;
-}
+import { CommonNavigationTitle, InputCell, SelectCell, SwitchCell } from '../component/CommonComponents';
+import { Validator } from '../utils/UiUtils';
 
 @Entry
 @Component
@@ -16,140 +13,73 @@ struct DnsEditPage {
   @State selectedType: DnsType = DnsType.UDP;
   @State preferHttp3: boolean = false;
   @State isEditMode: boolean = false;
+  @State isBackupMode: boolean = false;
   @State currentId: string = '';
   @StorageProp('topSafeHeight') topSafeHeight: number = 0;
-
-  isValidIp(ip: string): boolean {
-    if (this.selectedType === DnsType.DOH) {
-      return ip.startsWith('https://') || ip.startsWith('http://');
-    }
-    const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-    return ipv4Regex.test(ip);
-  }
+  @StorageProp('bottomSafeHeight') bottomSafeHeight: number = 0;
 
   async aboutToAppear() {
     DnsDataManager.getInstance().init(getContext(this));
     const params = router.getParams() as Record<string, Object>;
-    if (params && params['id']) {
-      this.isEditMode = true;
-      this.currentId = params['id'] as string;
-      const list = DnsDataManager.getInstance().getDnsList();
-      const dns = list.find(d => d.id === this.currentId);
-      if (dns) {
-        this.name = dns.name;
-        this.primaryDns = dns.primaryDns;
-        this.selectedType = dns.type || DnsType.UDP;
-        this.preferHttp3 = dns.preferHttp3 || false;
+
+    if (params) {
+      if (params['isBackup']) {
+        this.isBackupMode = params['isBackup'] as boolean;
+      }
+
+      if (params['id']) {
+        this.isEditMode = true;
+        this.currentId = params['id'] as string;
+
+        let list: DnsInfo[] = [];
+        if (this.isBackupMode) {
+          list = DnsDataManager.getInstance().getBackupDnsList();
+        } else {
+          list = DnsDataManager.getInstance().getDnsList();
+        }
+
+        const dns = list.find(d => d.id === this.currentId);
+        if (dns) {
+          this.name = dns.name;
+          this.primaryDns = dns.primaryDns;
+          this.selectedType = dns.type || DnsType.UDP;
+          this.preferHttp3 = dns.preferHttp3 || false;
+        }
+      } else if (this.isBackupMode) {
+        // 添加模式且是备用 DNS，默认选中 UDP
+        this.selectedType = DnsType.UDP;
       }
     }
   }
 
-  @Builder
-  InputCell(title: string, placeholder: string, value: string, onChange: (val: string) => void) {
-    Row() {
-      Text(title)
-        .width(80)
-        .fontSize($r('app.float.text_size_body'))
-        .fontColor($r('app.color.text_primary'))
-
-      TextInput({ text: value, placeholder: placeholder })
-        .textAlign(TextAlign.Start)
-        .fontSize($r('app.float.text_size_body'))
-        .fontColor($r('app.color.text_primary'))
-        .placeholderColor($r('app.color.text_secondary'))
-        .backgroundColor(Color.Transparent)
-        .height('100%')
-        .layoutWeight(1)
-        .onChange(onChange)
-    }
-    .width('100%')
-    .height($r('app.float.list_item_height'))
-    .padding({ left: 16, right: 16 })
-    .backgroundColor($r('app.color.card_background'))
-  }
-
-  @Builder
-  SwitchCell(title: string, isOn: boolean, onChange: (isOn: boolean) => void) {
-    Row() {
-      Text(title)
-        .fontSize($r('app.float.text_size_body'))
-        .fontColor($r('app.color.text_primary'))
-
-      Blank()
-
-      Toggle({ type: ToggleType.Switch, isOn: isOn })
-        .selectedColor($r('app.color.brand_color'))
-        .switchPointColor('#FFFFFF')
-        .onChange(onChange)
-    }
-    .width('100%')
-    .height($r('app.float.list_item_height'))
-    .padding({ left: 16, right: 16 })
-    .backgroundColor($r('app.color.card_background'))
-  }
-
-  @Builder
-  SelectCell(title: string, value: string, options: string[], onSelect: (val: string) => void) {
-    Row() {
-      Text(title)
-        .width(80)
-        .fontSize($r('app.float.text_size_body'))
-        .fontColor($r('app.color.text_primary'))
-
-      Select(options.map((v): DropdownOption => ({ value: v })))
-        .selected(options.indexOf(value))
-        .value(value)
-        .font({ size: $r('app.float.text_size_body') })
-        .fontColor($r('app.color.text_primary'))
-        .selectedOptionFont({ size: $r('app.float.text_size_body') })
-        .selectedOptionFontColor($r('app.color.brand_color'))
-        .selectedOptionBgColor($r('app.color.status_active_bg'))
-        .optionFont({ size: $r('app.float.text_size_body') })
-        .optionFontColor($r('app.color.text_primary'))
-        .menuBackgroundColor($r('app.color.card_background'))
-        .backgroundColor(Color.Transparent)
-        .onSelect((index: number, val: string) => onSelect(val))
-        .height('100%')
-        .layoutWeight(1)
-    }
-    .width('100%')
-    .height($r('app.float.list_item_height'))
-    .padding({ left: 16, right: 0 })
-    .backgroundColor($r('app.color.card_background'))
-  }
-
   async save() {
     if (this.name && this.primaryDns) {
-      if (!this.isValidIp(this.primaryDns)) {
+      if (!Validator.isValidIp(this.primaryDns)) {
         promptAction.showToast({ message: 'DNS 格式不正确' });
         return;
       }
 
       if (this.isEditMode) {
         const dns = new DnsInfo(this.name, this.primaryDns, false, this.selectedType, this.currentId, this.preferHttp3);
-        await DnsDataManager.getInstance().updateDns(dns);
+        if (this.isBackupMode) {
+          await DnsDataManager.getInstance().updateBackupDns(dns);
+        } else {
+          await DnsDataManager.getInstance().updateDns(dns);
+        }
         promptAction.showToast({ message: '修改成功' });
       } else {
         const dns = new DnsInfo(this.name, this.primaryDns, false, this.selectedType, undefined, this.preferHttp3);
-        await DnsDataManager.getInstance().addDns(dns);
+        if (this.isBackupMode) {
+          await DnsDataManager.getInstance().addBackupDns(dns);
+        } else {
+          await DnsDataManager.getInstance().addDns(dns);
+        }
         promptAction.showToast({ message: '添加成功' });
       }
       router.back();
     } else {
       promptAction.showToast({ message: '请填写完整信息' });
     }
-  }
-
-  @Builder
-  NavigationTitle() {
-    Row() {
-      Text(this.isEditMode ? '编辑 DNS' : '添加 DNS')
-        .fontSize($r('app.float.text_size_title'))
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.text_primary'))
-    }
-    .height('100%')
-    .justifyContent(FlexAlign.Center)
   }
 
   @Builder
@@ -168,62 +98,87 @@ struct DnsEditPage {
   }
 
   build() {
-    Column() {
-      Navigation() {
-        Column() {
-          List() {
-            ListItem() {
-              Column() {
-                this.InputCell('名称', '请输入服务名称', this.name, (value) => this.name = value)
-                Divider()
-                  .color($r('app.color.divider_color'))
-                  .strokeWidth(0.5)
-                  .padding({ left: 16 })
+    Navigation() {
+      Column() {
+        List() {
+          ListItem() {
+            Column() {
+              InputCell({
+                title: '名称',
+                placeholder: '请输入服务名称',
+                value: this.name,
+                onChange: (val) => { this.name = val; }
+              })
+              Divider()
+                .color($r('app.color.divider_color'))
+                .strokeWidth(0.5)
+                .padding({ left: 16 })
 
-                this.SelectCell('类型', this.selectedType, Object.values(DnsType),
-                  (value) => this.selectedType = value as DnsType)
-                
+              if (!this.isBackupMode) {
+                SelectCell({
+                  title: '类型',
+                  value: this.selectedType,
+                  options: Object.values(DnsType),
+                  onSelect: (value) => this.selectedType = value as DnsType
+                })
+
                 if (this.selectedType === DnsType.DOH) {
                   Divider()
                     .color($r('app.color.divider_color'))
                     .strokeWidth(0.5)
                     .padding({ left: 16 })
-                  this.SwitchCell('优先使用 HTTP/3', this.preferHttp3, (isOn) => this.preferHttp3 = isOn)
+                  SwitchCell({
+                    title: '优先使用 HTTP/3',
+                    isOn: this.preferHttp3,
+                    onChange: (isOn) => { this.preferHttp3 = isOn; }
+                  })
                 }
-
-                Divider()
-                  .color($r('app.color.divider_color'))
-                  .strokeWidth(0.5)
-                  .padding({ left: 16 })
-
-                this.InputCell('DNS', '请输入DNS地址', this.primaryDns, (value) => this.primaryDns = value)
+              } else {
+                // 备用模式仅支持 UDP，不展示选择器，或者展示只读
+                SelectCell({
+                  title: '类型',
+                  value: 'UDP',
+                  options: ['UDP'],
+                  onSelect: () => {}
+                })
               }
-              .width('100%')
-              .borderRadius(12)
-              .clip(true)
-              .backgroundColor($r('app.color.card_background'))
+
+              Divider()
+                .color($r('app.color.divider_color'))
+                .strokeWidth(0.5)
+                .padding({ left: 16 })
+
+              InputCell({
+                title: 'DNS',
+                placeholder: '请输入DNS地址',
+                value: this.primaryDns,
+                onChange: (val) => { this.primaryDns = val; }
+              })
             }
-            .padding({ left: 16, right: 16 })
+            .width('100%')
+            .borderRadius(12)
+            .clip(true)
+            .backgroundColor($r('app.color.card_background'))
           }
-          .width('100%')
-          .layoutWeight(1)
-          .margin({ top: 12 })
+          .padding({ left: 16, right: 16 })
         }
         .width('100%')
-        .height('100%')
-        .backgroundColor($r('app.color.start_window_background'))
+        .layoutWeight(1)
+        .margin({ top: 16 })
+        .padding({ bottom: 16 })
       }
-      .title(this.NavigationTitle())
-      .titleMode(NavigationTitleMode.Mini)
-      .menus(this.NavigationMenus())
       .width('100%')
       .height('100%')
-      .backgroundColor($r('app.color.tab_bar_background'))
+      .backgroundColor($r('app.color.start_window_background'))
     }
+    .title(() => {
+      CommonNavigationTitle({ title: this.isEditMode ? '编辑 DNS' : '添加 DNS' })
+    })
+    .titleMode(NavigationTitleMode.Mini)
+    .menus(this.NavigationMenus())
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.tab_bar_background'))
     .padding({ top: this.topSafeHeight })
   }
 }
-

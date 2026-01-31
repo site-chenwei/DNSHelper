@@ -18,6 +18,7 @@ struct Index {
     window.getLastWindow(getContext(this)).then(currentWindow => {
       let bottom = currentWindow.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR).bottomRect;
       this.bottomSafeHeight = px2vp(bottom.height);
+      AppStorage.setOrCreate('bottomSafeHeight', px2vp(bottom.height));
 
       let top = currentWindow.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM).topRect;
       AppStorage.setOrCreate('topSafeHeight', px2vp(top.height));
@@ -25,6 +26,7 @@ struct Index {
       currentWindow.on('avoidAreaChange', async (data) => {
         if (data.type === window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR) {
           this.bottomSafeHeight = px2vp(data.area.bottomRect.height);
+          AppStorage.setOrCreate('bottomSafeHeight', px2vp(data.area.bottomRect.height));
         } else if (data.type === window.AvoidAreaType.TYPE_SYSTEM) {
           AppStorage.setOrCreate('topSafeHeight', px2vp(data.area.topRect.height));
         }
@@ -35,21 +37,28 @@ struct Index {
   @Builder
   TabBuilder(title: string, targetIndex: number, selectedImg: Resource, normalImg: Resource) {
     Column() {
-      Image(this.currentIndex === targetIndex ? selectedImg : normalImg)
-        .size({ width: 24, height: 24 })
-        .objectFit(ImageFit.Contain)
-        .fillColor(this.currentIndex === targetIndex ? $r('app.color.brand_color') : $r('app.color.text_secondary'))
-      Text(title)
-        .fontColor(this.currentIndex === targetIndex ? $r('app.color.brand_color') : $r('app.color.text_secondary'))
-        .fontSize($r('app.float.text_size_small'))
-        .fontWeight(500)
+      Column() {
+        Image(this.currentIndex === targetIndex ? selectedImg : normalImg)
+          .size({ width: $r('app.float.icon_size_primary'), height: $r('app.float.icon_size_primary') })
+          .objectFit(ImageFit.Contain)
+          .fillColor(this.currentIndex === targetIndex ? $r('app.color.brand_color') : $r('app.color.text_secondary'))
+        Text(title)
+          .fontColor(this.currentIndex === targetIndex ? $r('app.color.brand_color') : $r('app.color.text_secondary'))
+          .fontSize($r('app.float.text_size_small'))
+          .fontWeight($r('app.integer.font_weight_medium'))
+          .margin({ top: 2 })
+      }
+      .width('100%')
+      .height($r('app.float.tab_bar_height'))
+      .padding({ top: $r('app.float.tab_bar_padding'), bottom: this.bottomSafeHeight })
+      .justifyContent(FlexAlign.Center)
     }
     .width('100%')
     .height(56 + this.bottomSafeHeight)
     .padding({ bottom: this.bottomSafeHeight + 5, top: 5 })
     .justifyContent(FlexAlign.SpaceBetween)
     .backgroundColor($r('app.color.tab_bar_background'))
-    .border({ width: { top: 0.5 }, color: $r('app.color.divider_color') })
+    .border({ width: { top: $r('app.float.tab_bar_border_width') }, color: $r('app.color.divider_color') })
     .onClick(() => {
       this.currentIndex = targetIndex;
       this.controller.changeIndex(this.currentIndex);

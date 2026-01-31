@@ -1,6 +1,8 @@
 {
   "src": [
     "pages/Index",
-    "pages/DnsEditPage"
+    "pages/DnsEditPage",
+    "pages/BackupDnsPage",
+    "pages/VersionInfoPage"
   ]
 }

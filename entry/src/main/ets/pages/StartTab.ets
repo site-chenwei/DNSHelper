@@ -1,46 +1,10 @@
 import { DnsInfo } from '../model/DnsInfo';
 import { DnsDataManager } from '../utils/DnsDataManager';
+import { SettingsItem } from '../component/CommonComponents';
 import common from '@ohos.app.ability.common';
 import { vpnExtension } from '@kit.NetworkKit';
 import { Want } from '@kit.AbilityKit';
 import commonEventManager from '@ohos.commonEventManager';
-
-@Component
-struct SettingsItem {
-  @Prop title: string = '';
-  @Prop value: string = '';
-  @Prop showArrow: boolean = true;
-  onClickHandler?: () => void;
-
-  build() {
-    Row() {
-      Text(this.title)
-        .fontSize($r('app.float.text_size_body'))
-        .fontColor($r('app.color.text_primary'))
-      
-      Blank()
-
-      Text(this.value)
-        .fontSize($r('app.float.text_size_body'))
-        .fontColor($r('app.color.text_secondary'))
-        .margin({ right: 4 })
-
-      if (this.showArrow) {
-        Image($r('app.media.ic_arrow_right'))
-          .width(24)
-          .height(24)
-          .fillColor($r('app.color.icon_secondary'))
-      }
-    }
-    .width('100%')
-    .height($r('app.float.list_item_height'))
-    .padding({ left: 16, right: 16 })
-    .backgroundColor($r('app.color.card_background'))
-    .onClick(() => {
-      if (this.onClickHandler) this.onClickHandler();
-    })
-  }
-}
 
 @Component
 struct WaveView {
@@ -96,15 +60,15 @@ struct WaveView {
   build() {
     Stack() {
       Circle()
-        .width(180)
-        .height(180)
+        .width($r('app.float.wave_size'))
+        .height($r('app.float.wave_size'))
         .fill($r('app.color.brand_color'))
         .scale({ x: this.waveScale1, y: this.waveScale1 })
         .opacity(this.waveOpacity1)
 
       Circle()
-        .width(180)
-        .height(180)
+        .width($r('app.float.wave_size'))
+        .height($r('app.float.wave_size'))
         .fill($r('app.color.brand_color'))
         .scale({ x: this.waveScale2, y: this.waveScale2 })
         .opacity(this.waveOpacity2)
@@ -118,6 +82,7 @@ struct WaveView {
 @Component
 export default struct StartTab {
   @StorageProp('topSafeHeight') topSafeHeight: number = 0;
+  @StorageProp('bottomSafeHeight') bottomSafeHeight: number = 0;
   @StorageLink('isRunning') @Watch('onRunningChange') isRunning: boolean = false;
   @StorageLink('vpnStartTime') vpnStartTime: number = 0;
   @State durationStr: string = '00:00:00';
@@ -262,6 +227,27 @@ export default struct StartTab {
       dnsIps = [selectedDns.primaryDns];
     }
 
+    // 获取备用 DNS 列表 (仅 UDP)
+    const backupList = DnsDataManager.getInstance().getBackupDnsList();
+    const currentBackupId = AppStorage.get<string>('currentBackupDnsId');
+    let backupIps: string[] = [];
+
+    if (currentBackupId) {
+      const selectedBackup = backupList.find(d => d.id === currentBackupId);
+      if (selectedBackup && selectedBackup.type === 'UDP') {
+        backupIps = [selectedBackup.primaryDns];
+      }
+    }
+
+    // 如果没有选中的（理论上应该有），或者是选中的不是UDP，或者其他异常情况
+    // 降级策略：如果 backupIps 为空，但 backupList 有 UDP 节点，默认使用第一个 UDP 节点
+    if (backupIps.length === 0 && backupList.length > 0) {
+       const firstUdp = backupList.find(d => d.type === 'UDP');
+       if (firstUdp) {
+         backupIps = [firstUdp.primaryDns];
+       }
+    }
+
     const want: Want = {
       deviceId: "",
       bundleName: 'site.chenwei.dns',
@@ -269,7 +255,8 @@ export default struct StartTab {
       parameters: {
         dnsList: dnsIps,
         dnsType: selectedDns ? selectedDns.type : 'UDP',
-        preferHttp3: selectedDns ? (selectedDns.preferHttp3 || false) : false
+        preferHttp3: selectedDns ? (selectedDns.preferHttp3 || false) : false,
+        backupDnsList: backupIps
       }
     };
 
@@ -359,13 +346,13 @@ export default struct StartTab {
           
           Button() {
             Image($r('app.media.ic_power')) 
-              .width(80)
-              .height(80)
-              .fillColor(Color.White)
+              .width($r('app.float.start_icon_size'))
+              .height($r('app.float.start_icon_size'))
+              .fillColor($r('app.color.text_white'))
           }
-          .width(180)
-          .height(180)
-          .borderRadius(90)
+          .width($r('app.float.start_button_size'))
+          .height($r('app.float.start_button_size'))
+          .borderRadius($r('app.float.start_button_radius'))
           .backgroundColor(this.isRunning ? $r('app.color.brand_color') : $r('app.color.button_inactive_bg'))
           .shadow({ radius: 20, color: this.isRunning ? $r('app.color.brand_shadow_active') : $r('app.color.card_shadow'), offsetY: 10 })
           .scale({ x: this.buttonScale, y: this.buttonScale })
@@ -381,7 +368,7 @@ export default struct StartTab {
           .fontSize($r('app.float.text_size_sub_title'))
           .fontColor($r('app.color.text_primary'))
           .fontWeight(FontWeight.Medium)
-          .margin({ top: 30 })
+          .margin({ top: 8 })
         
         Text(this.isRunning ? `已运行 ${this.durationStr}` : '未连接')
           .fontSize($r('app.float.text_size_small'))
@@ -401,7 +388,7 @@ export default struct StartTab {
                 value: this.currentDnsName,
                 showArrow: true,
                 onClickHandler: () => {
-                  this.currentIndex = 1; // 切换到 DNS Tab
+                  this.showDnsSelector();
                 }
               })
               
@@ -423,7 +410,7 @@ export default struct StartTab {
         .width('100%')
       }
       .width('100%')
-      .padding({ left: 16, right: 16, bottom: 20 })
+      .padding({ left: 16, right: 16, bottom: 16 })
     }
     .width('100%')
     .height('100%')

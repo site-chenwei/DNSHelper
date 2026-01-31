@@ -29,3 +29,7 @@ export const DEFAULT_DNS_LIST: DnsInfo[] = [
   new DnsInfo('DNSPod', '119.29.29.29', true, DnsType.UDP, 'dns_dnspod'),
   new DnsInfo('Baidu DNS', '180.76.76.76', true, DnsType.UDP, 'dns_baidu')
 ];
+
+export const DEFAULT_BACKUP_DNS_LIST: DnsInfo[] = [
+  new DnsInfo('阿里 DNS', '223.5.5.5', true, DnsType.UDP, 'backup_dns_ali')
+];

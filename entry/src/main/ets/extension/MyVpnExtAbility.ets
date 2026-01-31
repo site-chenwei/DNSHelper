@@ -1,6 +1,6 @@
 import { VpnExtensionAbility, vpnExtension } from '@kit.NetworkKit';
 import { Want } from '@kit.AbilityKit';
-import { socket, http } from '@kit.NetworkKit';
+import { socket } from '@kit.NetworkKit';
 import { rcp } from '@kit.RemoteCommunicationKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import fs from '@ohos.file.fs';
@@ -21,7 +21,9 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
   private currentDnsList: string[] = ['223.5.5.5', '223.6.6.6'];
   private currentDnsType: string = DnsType.UDP;
   private preferHttp3: boolean = false;
+  private backupDnsList: string[] = [];
   private dnsRequestCount: number = 0;
+  private rcpSession: rcp.Session | undefined = undefined;
 
   onCreate(want: Want) {
     console.info(TAG, 'onCreate');
@@ -46,6 +48,9 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
       }
       if (want.parameters['preferHttp3']) {
         this.preferHttp3 = want.parameters['preferHttp3'] as boolean;
+      }
+      if (want.parameters['backupDnsList']) {
+        this.backupDnsList = want.parameters['backupDnsList'] as string[];
       }
     }
     this.startVpn();
@@ -89,6 +94,10 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
       console.info(TAG, `VPN 接口已创建, fd: ${this.tunFd}`);
 
       if (this.tunFd > 0) {
+        // 初始化 RCP Session
+        if (!this.rcpSession) {
+          this.rcpSession = rcp.createSession();
+        }
         this.isRunning = true;
         this.startPacketLoop();
       }
@@ -208,16 +217,32 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
         this.sendDoqQuery(dnsTarget, dnsPayload, sessionMap);
       } else {
         // UDP
-        if (!dnsTarget.includes(':')) {
-          socketV4.send({
-            address: { address: dnsTarget, port: 53, family: 1 },
-            data: dnsPayload
-          }).catch((err: BusinessError) => {
-            // console.error(TAG, `Forward DNS failed: ${JSON.stringify(err)}`);
-          });
-        }
+        this.sendUdpQuery(dnsTarget, dnsPayload, socketV4);
       }
     });
+
+    // 故障转移逻辑：2秒后如果未收到响应，则使用备用服务器
+    if (this.backupDnsList.length > 0) {
+      setTimeout(() => {
+        if (sessionMap.has(transId)) {
+          // console.info(TAG, `Primary DNS timed out for ${transId}, trying backups...`);
+          this.backupDnsList.forEach(backupTarget => {
+            this.sendUdpQuery(backupTarget, dnsPayload, socketV4);
+          });
+        }
+      }, 2000);
+    }
+  }
+
+  private sendUdpQuery(dnsTarget: string, dnsPayload: ArrayBuffer, socketV4: socket.UDPSocket) {
+    if (!dnsTarget.includes(':')) {
+      socketV4.send({
+        address: { address: dnsTarget, port: 53, family: 1 },
+        data: dnsPayload
+      }).catch((err: BusinessError) => {
+        // console.error(TAG, `Forward DNS failed: ${JSON.stringify(err)}`);
+      });
+    }
   }
 
   private async sendDotQuery(dnsTarget: string, dnsPayload: ArrayBuffer, sessionMap: Map<number, SessionInfo>) {
@@ -271,51 +296,43 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
 
   private async sendDohQuery(dohUrl: string, dnsPayload: ArrayBuffer, sessionMap: Map<number, SessionInfo>) {
     try {
-      // 如果启用 HTTP/3 优先，使用 rcp
-      if (this.preferHttp3) {
-        const session = rcp.createSession();
-        const request = new rcp.Request(dohUrl, 'POST');
-        request.content = dnsPayload;
-        request.headers = {
-          'content-type': 'application/dns-message',
-          'accept': 'application/dns-message'
+      if (!this.rcpSession) {
+        // 创建 Session 配置
+        const sessionConfig: rcp.SessionConfiguration = {
+          requestConfiguration: {
+            security: {
+              remoteValidation: 'skip' // 忽略证书验证（可选，视需求而定）
+            }
+          }
         };
         
-        // rcp 会根据服务端支持情况自动协商 HTTP/3 (QUIC)
-        const response = await session.fetch(request);
-
-        if (response.statusCode === 200 && response.body) {
-           let resultBuffer: ArrayBuffer;
-           if (typeof response.body === 'string') {
-                console.warn(TAG, 'DoH response is string, unexpected');
-                return;
-           } else {
-                resultBuffer = response.body as ArrayBuffer;
-           }
-           this.processDnsResponse(resultBuffer, sessionMap);
-        } else {
-           console.error(TAG, `DoH (rcp) failed: ${response.statusCode}`);
-        }
-        session.close();
-        return;
+        // 如果明确优先使用 HTTP/3，我们可以在这里尝试设置相关参数
+        // 目前 rcp 主要依靠自动协商 (Alt-Svc)，但我们可以确保 connection pool 复用
+        this.rcpSession = rcp.createSession(sessionConfig);
       }
 
-      // 否则使用默认 http 模块 (HTTP/1.1 or HTTP/2)
-      const httpRequest = http.createHttp();
-      const response = await httpRequest.request(dohUrl, {
-        method: http.RequestMethod.POST,
-        header: {
-          'Content-Type': 'application/dns-message',
-          'Accept': 'application/dns-message'
-        },
-        extraData: dnsPayload,
-        expectDataType: http.HttpDataType.ARRAY_BUFFER
-      });
+      const request = new rcp.Request(dohUrl, 'POST');
+      request.content = dnsPayload;
+      request.headers = {
+        'content-type': 'application/dns-message',
+        'accept': 'application/dns-message'
+      };
+      
+      // rcp 会根据服务端支持情况自动协商 HTTP/3 (QUIC) 或降级使用 HTTP/2 / HTTP/1.1
+      const response = await this.rcpSession.fetch(request);
 
-      if (response.responseCode === 200 && response.result instanceof ArrayBuffer) {
-        this.processDnsResponse(response.result as ArrayBuffer, sessionMap);
+      if (response.statusCode === 200 && response.body) {
+          let resultBuffer: ArrayBuffer;
+          if (typeof response.body === 'string') {
+              console.warn(TAG, 'DoH response is string, unexpected');
+              return;
+          } else {
+              resultBuffer = response.body as ArrayBuffer;
+          }
+          this.processDnsResponse(resultBuffer, sessionMap);
+      } else {
+          console.error(TAG, `DoH (rcp) failed: ${response.statusCode}`);
       }
-      httpRequest.destroy();
     } catch (err) {
       console.error(TAG, `DoH 查询失败: ${JSON.stringify(err)}`);
     }

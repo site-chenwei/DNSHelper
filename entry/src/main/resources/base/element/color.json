@@ -17,8 +17,12 @@
       "value": "#86909C"
     },
     {
-      "name": "icon_secondary",
+      "name": "text_tertiary",
       "value": "#C9CDD4"
+    },
+    {
+      "name": "icon_secondary",
+      "value": "#86909C"
     },
     {
       "name": "brand_color",
@@ -67,6 +71,50 @@
     {
       "name": "brand_shadow_active",
       "value": "#6611B882"
+    },
+    {
+      "name": "dns_type_udp",
+      "value": "#0A59F7"
+    },
+    {
+      "name": "dns_type_doq",
+      "value": "#F76560"
+    },
+    {
+      "name": "dns_type_doh",
+      "value": "#13C2C2"
+    },
+    {
+      "name": "dns_type_dot",
+      "value": "#722ED1"
+    },
+    {
+      "name": "dns_type_udp_bg",
+      "value": "#E6F7FF"
+    },
+    {
+      "name": "dns_type_doq_bg",
+      "value": "#FFF1F0"
+    },
+    {
+      "name": "dns_type_doh_bg",
+      "value": "#E6FFFB"
+    },
+    {
+      "name": "dns_type_dot_bg",
+      "value": "#F9F0FF"
+    },
+    {
+      "name": "tag_custom_text",
+      "value": "#FA8C16"
+    },
+    {
+      "name": "tag_custom_bg",
+      "value": "#FFF7E6"
+    },
+    {
+      "name": "text_white",
+      "value": "#FFFFFF"
     }
   ]
 }
