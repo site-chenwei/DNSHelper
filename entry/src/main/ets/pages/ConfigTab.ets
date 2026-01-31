@@ -1,21 +1,23 @@
-import { DEFAULT_DNS_LIST, DnsInfo, DnsType } from '../model/DnsInfo';
+import { DnsInfo, DnsType } from '../model/DnsInfo';
 import { DnsDataManager } from '../utils/DnsDataManager';
 import { promptAction, router } from '@kit.ArkUI';
-import { DnsTag, CommonDeleteButton, CommonNavigationTitle } from '../component/CommonComponents';
+import { DnsTag, CommonNavigationTitle } from '../component/CommonComponents';
 
 @Component
 export default struct ConfigTab {
   @StorageLink('dnsList') dnsList: DnsInfo[] = [];
-  @StorageLink('currentDnsId') currentDnsId: string = '';
+  @StorageLink('selectedDnsIds') selectedDnsIds: string[] = [];
   @StorageProp('topSafeHeight') topSafeHeight: number = 0;
   @StorageProp('bottomSafeHeight') bottomSafeHeight: number = 0;
-  // 记录当前处于左滑打开状态的 item ID
-  @State swipingItemId: string = '';
 
   async aboutToAppear() {
     await DnsDataManager.getInstance().init(getContext(this));
   }
 
+  @Builder
+  NavigationTitle() {
+    CommonNavigationTitle({ title: 'DNS列表' })
+  }
 
   @Builder
   NavigationMenus() {
@@ -40,25 +42,33 @@ export default struct ConfigTab {
   build() {
     Navigation() {
       Column() {
+        Row() {
+          Image($r('app.media.ic_dns_filled'))
+            .width(16)
+            .height(16)
+            .fillColor($r('app.color.text_secondary'))
+            .margin({ right: 8 })
+          Text('支持多选，将并发请求所有选中的DNS服务')
+            .fontSize($r('app.float.text_size_small'))
+            .fontColor($r('app.color.text_secondary'))
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, top: 16})
+        .alignItems(VerticalAlign.Center)
+
         List({ space: 12 }) {
           ForEach(this.dnsList, (item: DnsInfo) => {
             ListItem() {
               Row() {
-                // 选择按钮区域
                 Column() {
-                  Radio({ value: item.id, group: 'dnsGroup' })
-                    .checked(item.id === this.currentDnsId)
-                    .radioStyle({ checkedBackgroundColor: $r('app.color.brand_color') })
-                    .onChange((isChecked: boolean) => {
-                      if (isChecked) {
-                        DnsDataManager.getInstance().setCurrentDnsId(item.id);
-                      }
-                    })
+                  Checkbox({ name: 'checkbox_' + item.id })
+                    .select(this.selectedDnsIds.includes(item.id))
+                    .selectedColor($r('app.color.brand_color'))
+                    .hitTestBehavior(HitTestMode.None)
                 }
                 .justifyContent(FlexAlign.Center)
                 .padding({ left: 16, right: 8 })
 
-                // 内容区域
                 Column() {
                   Row() {
                     Column() {
@@ -85,20 +95,34 @@ export default struct ConfigTab {
                     .layoutWeight(1)
                     .alignItems(HorizontalAlign.Start)
 
-                    if (!item.isDefault && this.swipingItemId !== item.id) {
-                      Image($r('app.media.ic_public_edit'))
-                        .width($r('app.float.icon_size_secondary'))
-                        .height($r('app.float.icon_size_secondary'))
-                        .fillColor($r('app.color.icon_secondary'))
-                        .onClick(() => {
-                          router.pushUrl({
-                            url: 'pages/DnsEditPage',
-                            params: {
-                              id: item.id
-                            }
+                    if (!this.selectedDnsIds.includes(item.id)) {
+                      Row() {
+                        if (!item.isDefault) {
+                          Image($r('app.media.ic_public_edit'))
+                            .width($r('app.float.icon_size_secondary'))
+                            .height($r('app.float.icon_size_secondary'))
+                            .fillColor($r('app.color.brand_color'))
+                            .onClick(() => {
+                              router.pushUrl({
+                                url: 'pages/DnsEditPage',
+                                params: {
+                                  id: item.id
+                                }
+                              })
+                            })
+                            .margin({ right: 16 })
+                        }
+                        
+                        Image($r('app.media.ic_public_delete'))
+                          .width($r('app.float.icon_size_secondary'))
+                          .height($r('app.float.icon_size_secondary'))
+                          .fillColor($r('app.color.functional_red'))
+                          .onClick(async () => {
+                             await DnsDataManager.getInstance().removeDns(item.id);
+                             promptAction.showToast({ message: '删除成功' });
                           })
-                        })
-                        .padding({ left: 4 }) // Adjust padding for icon
+                      }
+                      .padding({ left: 4 })
                     }
                   }
                   .width('100%')
@@ -113,33 +137,12 @@ export default struct ConfigTab {
               .borderRadius(12)
               .onClick(() => {
                 // 点击整个卡片（非删除区）切换选中
-                DnsDataManager.getInstance().setCurrentDnsId(item.id);
+                DnsDataManager.getInstance().toggleDnsId(item.id);
               })
             }
-            .swipeAction(item.id === this.currentDnsId ? undefined : {
-              end: {
-                builder: () => {
-                  CommonDeleteButton({
-                    onClickHandler: async () => {
-                      await DnsDataManager.getInstance().removeDns(item.id);
-                      promptAction.showToast({ message: '删除成功' });
-                    }
-                  })
-                },
-                onStateChange: (state: SwipeActionState) => {
-                  if (state === SwipeActionState.EXPANDED) {
-                    this.swipingItemId = item.id;
-                  } else if (state === SwipeActionState.COLLAPSED) {
-                    if (this.swipingItemId === item.id) {
-                      this.swipingItemId = '';
-                    }
-                  }
-                }
-              }
-            })
             .clip(true)
             .borderRadius(12)
-          }, (item: DnsInfo) => item.id)
+          }, (item: DnsInfo) => JSON.stringify(item) + '_' + (this.selectedDnsIds.includes(item.id) ? 'selected' : 'unselected'))
         }
         .width('100%')
         .layoutWeight(1)
@@ -150,9 +153,7 @@ export default struct ConfigTab {
       .height('100%')
       .backgroundColor($r('app.color.start_window_background'))
     }
-    .title(() => {
-      CommonNavigationTitle({ title: 'DNS列表' })
-    })
+    .title(this.NavigationTitle())
     .titleMode(NavigationTitleMode.Mini)
     .menus(this.NavigationMenus())
     .width('100%')

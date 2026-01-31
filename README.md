@@ -1,6 +1,6 @@
-# DNSHelper (DNS助手)
+# DNS助手 (DNSHelper)
 
-DNSHelper 是一款基于 HarmonyOS Next 开发的原生应用，旨在为用户提供便捷的 DNS 服务管理体验。用户可以自定义配置多个 DNS 服务器，并根据需求快速切换和激活指定的 DNS 服务。
+DNS助手 是一款基于 HarmonyOS Next 开发的原生应用，旨在为用户提供便捷的 DNS 服务管理体验。用户可以自定义配置多个 DNS 服务器，并根据需求快速切换和激活指定的 DNS 服务。
 
 ## 核心功能
 

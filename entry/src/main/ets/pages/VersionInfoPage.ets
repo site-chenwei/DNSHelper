@@ -4,7 +4,7 @@ import { CommonNavigationTitle } from '../component/CommonComponents';
 @Entry
 @Component
 struct VersionInfoPage {
-  @State appName: string = 'DNSHelper';
+  @State appName: string = 'DNS助手';
   @State versionName: string = '1.0.0';
   @StorageProp('topSafeHeight') topSafeHeight: number = 0;
   @StorageProp('bottomSafeHeight') bottomSafeHeight: number = 0;

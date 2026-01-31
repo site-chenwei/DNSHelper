@@ -1,6 +1,7 @@
 import { DnsInfo, DEFAULT_DNS_LIST, DEFAULT_BACKUP_DNS_LIST } from '../model/DnsInfo';
 import common from '@ohos.app.ability.common';
 import dataPreferences from '@ohos.data.preferences';
+import { promptAction } from '@kit.ArkUI';
 
 export class DnsDataManager {
   private static instance: DnsDataManager;
@@ -41,26 +42,38 @@ export class DnsDataManager {
       dnsList = [...DEFAULT_DNS_LIST]; // 克隆默认列表
       this.saveDnsListToPrefs(dnsList);
     }
+
     AppStorage.setOrCreate('dnsList', dnsList);
 
-    // 加载当前 DNS ID
-    let currentId = '';
+    // 加载当前选中的 DNS IDs
+    let selectedIds: string[] = [];
     try {
-      currentId = await this.preferences.get('saved_dns_id', '') as string;
+      const jsonStr = await this.preferences.get('saved_selected_dns_ids', '') as string;
+      if (jsonStr) {
+        selectedIds = JSON.parse(jsonStr) as string[];
+      }
     } catch (e) {
-      console.error('Failed to load current id', JSON.stringify(e));
+      console.error('Failed to load selected ids', JSON.stringify(e));
     }
 
-    // 验证 ID 有效性
-    const isValid = currentId && dnsList.some(d => d.id === currentId);
-    console.info(`DnsDataManager init: loadedId=${currentId}, isValid=${isValid}`);
-
-    if (!isValid && dnsList.length > 0) {
-      currentId = dnsList[0].id;
-      console.info(`DnsDataManager init: resetting to first DNS: ${currentId}`);
-      this.saveCurrentIdToPrefs(currentId);
+    // 验证 IDs 有效性 (移除不存在的)
+    if (selectedIds.length > 0) {
+      const validIds = selectedIds.filter(id => dnsList.some(d => d.id === id));
+      if (validIds.length !== selectedIds.length) {
+         selectedIds = validIds;
+         this.saveSelectedDnsIdsToPrefs(selectedIds);
+      }
     }
-    AppStorage.setOrCreate('currentDnsId', currentId);
+    
+    // 如果没有选中的，默认选中第一个
+    if (selectedIds.length === 0 && dnsList.length > 0) {
+      selectedIds = [dnsList[0].id];
+      this.saveSelectedDnsIdsToPrefs(selectedIds);
+    }
+    
+    AppStorage.setOrCreate('selectedDnsIds', selectedIds);
+    // 为了兼容旧代码（如果有遗漏），保留 currentDnsId 为第一个选中的 ID
+    AppStorage.setOrCreate('currentDnsId', selectedIds.length > 0 ? selectedIds[0] : '');
 
     // 加载备用 DNS 列表
     let backupDnsList: DnsInfo[] = [];
@@ -75,7 +88,7 @@ export class DnsDataManager {
 
     // 确保默认备用 DNS 存在且位于首位
     const defaultBackup = DEFAULT_BACKUP_DNS_LIST[0];
-    const existsIndex = backupDnsList.findIndex(d => d.id === defaultBackup.id);
+    const existsIndex = backupDnsList.findIndex(d => (d.id === defaultBackup.id || d.primaryDns === defaultBackup.primaryDns));
     if (existsIndex === -1) {
       backupDnsList.unshift(defaultBackup);
       this.saveBackupDnsListToPrefs(backupDnsList);
@@ -91,7 +104,7 @@ export class DnsDataManager {
       console.error('Failed to load current backup id', JSON.stringify(e));
     }
 
-    // 验证 ID 有效性，如果无效且列表不为空，默认选中第一个（通常是阿里DNS）
+    // 验证 ID 有效性
     const isBackupValid = currentBackupId && backupDnsList.some(d => d.id === currentBackupId);
     if (!isBackupValid && backupDnsList.length > 0) {
       currentBackupId = backupDnsList[0].id;
@@ -110,15 +123,17 @@ export class DnsDataManager {
     }
   }
 
-  private async saveCurrentIdToPrefs(id: string) {
+  private async saveSelectedDnsIdsToPrefs(ids: string[]) {
     if (!this.preferences) return;
     try {
-      await this.preferences.put('saved_dns_id', id);
+      await this.preferences.put('saved_selected_dns_ids', JSON.stringify(ids));
       await this.preferences.flush();
     } catch (e) {
-      console.error('Failed to save current id', JSON.stringify(e));
+      console.error('Failed to save selected ids', JSON.stringify(e));
     }
   }
+
+  // private async saveCurrentIdToPrefs(id: string) { ... } // Deprecated
 
   private async saveBackupDnsListToPrefs(list: DnsInfo[]) {
     if (!this.preferences) return;
@@ -141,13 +156,23 @@ export class DnsDataManager {
     await this.saveDnsListToPrefs(list);
   }
 
-  async updateDns(dns: DnsInfo) {
+  async updateDns(dns: DnsInfo, originalId?: string) {
     let list = this.getDnsList();
-    const index = list.findIndex(item => item.id === dns.id);
+    const targetId = originalId || dns.id;
+    const index = list.findIndex(item => item.id === targetId);
     if (index !== -1) {
       list[index] = dns;
       AppStorage.setOrCreate('dnsList', list);
       await this.saveDnsListToPrefs(list);
+
+      // 如果修改了 IP (ID 变化)，且当前选中项包含旧 ID，需要更新选中项
+      if (targetId !== dns.id) {
+        const selectedIds = AppStorage.get<string[]>('selectedDnsIds') || [];
+        if (selectedIds.includes(targetId)) {
+          const newSelectedIds = selectedIds.map(id => id === targetId ? dns.id : id);
+          await this.setSelectedDnsIds(newSelectedIds);
+        }
+      }
     }
   }
 
@@ -157,20 +182,44 @@ export class DnsDataManager {
     AppStorage.setOrCreate('dnsList', list);
     await this.saveDnsListToPrefs(list);
 
-    // 如果删除了当前选中的 DNS，尝试切换到第一个，或者置空
-    const currentId = AppStorage.get<string>('currentDnsId');
-    if (currentId === id) {
-      if (list.length > 0) {
-        await this.setCurrentDnsId(list[0].id);
-      } else {
-        await this.setCurrentDnsId('');
+    // 如果删除了选中的 DNS，从选中列表中移除
+    const selectedIds = AppStorage.get<string[]>('selectedDnsIds') || [];
+    if (selectedIds.includes(id)) {
+      const newSelectedIds = selectedIds.filter(sid => sid !== id);
+      // 如果全部删完了，且还有列表项，默认选中第一个
+      if (newSelectedIds.length === 0 && list.length > 0) {
+        newSelectedIds.push(list[0].id);
       }
+      await this.setSelectedDnsIds(newSelectedIds);
     }
   }
   
+  async setSelectedDnsIds(ids: string[]) {
+      AppStorage.setOrCreate('selectedDnsIds', ids);
+      // Update compatibility field
+      AppStorage.setOrCreate('currentDnsId', ids.length > 0 ? ids[0] : '');
+      await this.saveSelectedDnsIdsToPrefs(ids);
+  }
+
+  async toggleDnsId(id: string) {
+      const selectedIds = AppStorage.get<string[]>('selectedDnsIds') || [];
+      let newSelectedIds: string[];
+      if (selectedIds.includes(id)) {
+          // If it's the only one, don't allow deselecting
+          if (selectedIds.length === 1) {
+              promptAction.showToast({ message: '至少需要启用一个DNS服务' });
+              return; 
+          }
+          newSelectedIds = selectedIds.filter(sid => sid !== id);
+      } else {
+          newSelectedIds = [...selectedIds, id];
+      }
+      await this.setSelectedDnsIds(newSelectedIds);
+  }
+
+  // Deprecated wrapper
   async setCurrentDnsId(id: string) {
-      AppStorage.setOrCreate('currentDnsId', id);
-      await this.saveCurrentIdToPrefs(id);
+      await this.setSelectedDnsIds([id]);
   }
 
   private async saveCurrentBackupIdToPrefs(id: string) {
@@ -199,13 +248,22 @@ export class DnsDataManager {
     await this.saveBackupDnsListToPrefs(list);
   }
 
-  async updateBackupDns(dns: DnsInfo) {
+  async updateBackupDns(dns: DnsInfo, originalId?: string) {
     let list = this.getBackupDnsList();
-    const index = list.findIndex(item => item.id === dns.id);
+    const targetId = originalId || dns.id;
+    const index = list.findIndex(item => item.id === targetId);
     if (index !== -1) {
       list[index] = dns;
       AppStorage.setOrCreate('backupDnsList', list);
       await this.saveBackupDnsListToPrefs(list);
+
+      // 如果修改了 IP (ID 变化)，且当前选中项是旧 ID，需要更新选中项
+      if (targetId !== dns.id) {
+        const currentBackupId = AppStorage.get<string>('currentBackupDnsId');
+        if (currentBackupId === targetId) {
+          await this.setCurrentBackupDnsId(dns.id);
+        }
+      }
     }
   }
 

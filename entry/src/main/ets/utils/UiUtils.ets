@@ -5,8 +5,6 @@ export class UiUtils {
     switch (type) {
       case DnsType.UDP:
         return $r('app.color.dns_type_udp');
-      case DnsType.DOQ:
-        return $r('app.color.dns_type_doq');
       case DnsType.DOH:
         return $r('app.color.dns_type_doh');
       case DnsType.DOT:
@@ -20,8 +18,6 @@ export class UiUtils {
     switch (type) {
       case DnsType.UDP:
         return $r('app.color.dns_type_udp_bg');
-      case DnsType.DOQ:
-        return $r('app.color.dns_type_doq_bg');
       case DnsType.DOH:
         return $r('app.color.dns_type_doh_bg');
       case DnsType.DOT:
@@ -38,6 +34,13 @@ export class Validator {
       return ip.startsWith('https://') || ip.startsWith('http://');
     }
     const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    
+    if (type === DnsType.DOT) {
+      // DOT 支持 IPv4 或域名
+      const domainRegex = /^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+      return ipv4Regex.test(ip) || domainRegex.test(ip);
+    }
+
     return ipv4Regex.test(ip);
   }
 }

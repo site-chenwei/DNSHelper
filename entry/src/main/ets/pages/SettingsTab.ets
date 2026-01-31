@@ -20,13 +20,18 @@ export default struct SettingsTab {
     return this.backupDnsList[0].name;
   }
 
+  @Builder
+  NavigationTitle() {
+    CommonNavigationTitle({ title: '设置' })
+  }
+
   build() {
     Navigation() {
       Column() {
         List({ space: 12 }) {
           ListItem() {
             SettingsItem({
-              title: '备用服务器配置',
+              title: '备用服务器',
               value: this.getBackupDnsSummary(),
               onClickHandler: () => {
                 router.pushUrl({ url: 'pages/BackupDnsPage' });
@@ -57,9 +62,7 @@ export default struct SettingsTab {
       .layoutWeight(1)
       .backgroundColor($r('app.color.start_window_background'))
     }
-    .title(() => {
-      CommonNavigationTitle({ title: '设置' })
-    })
+    .title(this.NavigationTitle())
     .titleMode(NavigationTitleMode.Mini)
     .hideBackButton(true)
     .width('100%')

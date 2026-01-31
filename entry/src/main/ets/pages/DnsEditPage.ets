@@ -60,15 +60,15 @@ struct DnsEditPage {
       }
 
       if (this.isEditMode) {
-        const dns = new DnsInfo(this.name, this.primaryDns, false, this.selectedType, this.currentId, this.preferHttp3);
+        const dns = new DnsInfo(this.name, this.primaryDns, false, this.selectedType, this.preferHttp3);
         if (this.isBackupMode) {
-          await DnsDataManager.getInstance().updateBackupDns(dns);
+          await DnsDataManager.getInstance().updateBackupDns(dns, this.currentId);
         } else {
-          await DnsDataManager.getInstance().updateDns(dns);
+          await DnsDataManager.getInstance().updateDns(dns, this.currentId);
         }
         promptAction.showToast({ message: '修改成功' });
       } else {
-        const dns = new DnsInfo(this.name, this.primaryDns, false, this.selectedType, undefined, this.preferHttp3);
+        const dns = new DnsInfo(this.name, this.primaryDns, false, this.selectedType, this.preferHttp3);
         if (this.isBackupMode) {
           await DnsDataManager.getInstance().addBackupDns(dns);
         } else {
@@ -80,6 +80,11 @@ struct DnsEditPage {
     } else {
       promptAction.showToast({ message: '请填写完整信息' });
     }
+  }
+
+  @Builder
+  NavigationTitle() {
+    CommonNavigationTitle({ title: this.isEditMode ? '编辑 DNS' : '添加 DNS' })
   }
 
   @Builder
@@ -132,7 +137,6 @@ struct DnsEditPage {
                   })
                 }
               } else {
-                // 备用模式仅支持 UDP，不展示选择器，或者展示只读
                 SelectCell({
                   title: '类型',
                   value: 'UDP',
@@ -168,9 +172,7 @@ struct DnsEditPage {
       .height('100%')
       .backgroundColor($r('app.color.start_window_background'))
     }
-    .title(() => {
-      CommonNavigationTitle({ title: this.isEditMode ? '编辑 DNS' : '添加 DNS' })
-    })
+    .title(this.NavigationTitle())
     .titleMode(NavigationTitleMode.Mini)
     .menus(this.NavigationMenus())
     .width('100%')

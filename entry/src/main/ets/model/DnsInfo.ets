@@ -1,8 +1,13 @@
 export enum DnsType {
   UDP = 'UDP',
   DOT = 'DOT',
-  DOH = 'DOH',
-  DOQ = 'DOQ'
+  DOH = 'DOH'
+}
+
+export interface DnsTargetConfig {
+  address: string;
+  type: string;
+  preferHttp3: boolean;
 }
 
 export class DnsInfo {
@@ -13,8 +18,9 @@ export class DnsInfo {
   type: DnsType;
   preferHttp3: boolean; // 新增字段：是否优先使用 HTTP/3
 
-  constructor(name: string, primaryDns: string, isDefault: boolean = false, type: DnsType = DnsType.UDP, id?: string, preferHttp3: boolean = false) {
-    this.id = id ? id : (Math.random().toString(36).slice(2, 9) + Date.now().toString(36));
+  constructor(name: string, primaryDns: string, isDefault: boolean = false, type: DnsType = DnsType.UDP,
+    preferHttp3: boolean = false) {
+    this.id = primaryDns;
     this.name = name;
     this.primaryDns = primaryDns;
     this.isDefault = isDefault;
@@ -24,12 +30,13 @@ export class DnsInfo {
 }
 
 export const DEFAULT_DNS_LIST: DnsInfo[] = [
-  new DnsInfo('Ali DNS (DoH)', 'https://dns.alidns.com/dns-query', true, DnsType.DOH, 'dns_ali'),
-  new DnsInfo('114 DNS', '114.114.114.114', true, DnsType.UDP, 'dns_114'),
-  new DnsInfo('DNSPod', '119.29.29.29', true, DnsType.UDP, 'dns_dnspod'),
-  new DnsInfo('Baidu DNS', '180.76.76.76', true, DnsType.UDP, 'dns_baidu')
+  new DnsInfo('阿里 DOH', 'https://dns.alidns.com/dns-query', true, DnsType.DOH, false),
+  new DnsInfo('阿里 DOT', 'dns.alidns.com', true, DnsType.DOT, false),
+  new DnsInfo('腾讯 DOH', 'https://doh.pub/dns-query', true, DnsType.DOH, false),
+  new DnsInfo('腾讯 DOT', 'dot.pub', true, DnsType.DOT, false),
+  new DnsInfo('关圣 DOH', 'https://2026.dns1.top/dns-query', true, DnsType.DOH, false),
 ];
 
 export const DEFAULT_BACKUP_DNS_LIST: DnsInfo[] = [
-  new DnsInfo('阿里 DNS', '223.5.5.5', true, DnsType.UDP, 'backup_dns_ali')
+  new DnsInfo('阿里 DNS', '223.5.5.5', true, DnsType.UDP, false)
 ];

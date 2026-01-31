@@ -9,7 +9,7 @@ import wifiManager from '@ohos.wifiManager';
 import connection from '@ohos.net.connection';
 import commonEventManager from '@ohos.commonEventManager';
 
-import { DnsType } from '../model/DnsInfo';
+import { DnsType, DnsTargetConfig } from '../model/DnsInfo';
 import { util } from '@kit.ArkTS';
 
 const TAG = '[MyVpnExtAbility]';
@@ -18,37 +18,29 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
   private vpnConnection: vpnExtension.VpnConnection | undefined = undefined;
   private tunFd: number = -1;
   private isRunning: boolean = false;
-  private currentDnsList: string[] = ['223.5.5.5', '223.6.6.6'];
-  private currentDnsType: string = DnsType.UDP;
-  private preferHttp3: boolean = false;
+  private dnsTargets: DnsTargetConfig[] = [];
   private backupDnsList: string[] = [];
   private dnsRequestCount: number = 0;
   private rcpSession: rcp.Session | undefined = undefined;
+  private lastPublishTime: number = 0;
+  private publishTimer: number = -1;
 
   onCreate(want: Want) {
     console.info(TAG, 'onCreate');
     this.handleWant(want);
   }
 
-  onRequest(want: Want, startId: number) {
-    console.info(TAG, 'onRequest', want);
-    // this.handleWant(want);
-  }
-
   private handleWant(want: Want) {
     if (want.parameters) {
-      if (want.parameters['dnsList']) {
-        const dnsList = want.parameters['dnsList'] as string[];
-        if (dnsList && dnsList.length > 0) {
-          this.currentDnsList = dnsList;
+      if (want.parameters['dnsConfigList']) {
+        try {
+          const jsonStr = want.parameters['dnsConfigList'] as string;
+          this.dnsTargets = JSON.parse(jsonStr) as DnsTargetConfig[];
+        } catch (e) {
+          console.error(TAG, 'Failed to parse dnsConfigList: ' + JSON.stringify(e));
         }
       }
-      if (want.parameters['dnsType']) {
-        this.currentDnsType = want.parameters['dnsType'] as string;
-      }
-      if (want.parameters['preferHttp3']) {
-        this.preferHttp3 = want.parameters['preferHttp3'] as boolean;
-      }
+
       if (want.parameters['backupDnsList']) {
         this.backupDnsList = want.parameters['backupDnsList'] as string[];
       }
@@ -75,7 +67,7 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
           address: { address: "10.1.10.1", family: 1 },
           prefixLength: 24
         }],
-        dnsAddresses: ["10.1.10.2"], // 告诉系统：我有这些 DNS，请优先用我
+        dnsAddresses: ["10.1.10.2"],
         routes: [{
           interface: 'vpn-tun',
           destination: {
@@ -115,6 +107,10 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
   }
 
   private async destroyVpn() {
+    if (this.publishTimer !== -1) {
+      clearTimeout(this.publishTimer);
+      this.publishTimer = -1;
+    }
     if (this.vpnConnection) {
       try {
         await this.vpnConnection.destroy();
@@ -151,9 +147,6 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
       } catch (e2) {
       }
     }
-
-    // Prepare Relay Socket (UDP IPv6) - REMOVED
-
 
     const sessionMap = new Map<number, SessionInfo>();
 
@@ -207,17 +200,15 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
       dstPort
     });
 
-    this.currentDnsList.forEach(dnsTarget => {
+    this.dnsTargets.forEach(target => {
       // Prioritize explicit type, but keep backward compatibility for URL detection
-      if (this.currentDnsType === DnsType.DOH || dnsTarget.startsWith('http://') || dnsTarget.startsWith('https://')) {
-        this.sendDohQuery(dnsTarget, dnsPayload, sessionMap);
-      } else if (this.currentDnsType === DnsType.DOT) {
-        this.sendDotQuery(dnsTarget, dnsPayload, sessionMap);
-      } else if (this.currentDnsType === DnsType.DOQ) {
-        this.sendDoqQuery(dnsTarget, dnsPayload, sessionMap);
+      if (target.type === DnsType.DOH) {
+        this.sendDohQuery(target.address, dnsPayload, sessionMap);
+      } else if (target.type === DnsType.DOT) {
+        this.sendDotQuery(target.address, dnsPayload, sessionMap);
       } else {
         // UDP
-        this.sendUdpQuery(dnsTarget, dnsPayload, socketV4);
+        this.sendUdpQuery(target.address, dnsPayload, socketV4);
       }
     });
 
@@ -225,7 +216,6 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
     if (this.backupDnsList.length > 0) {
       setTimeout(() => {
         if (sessionMap.has(transId)) {
-          // console.info(TAG, `Primary DNS timed out for ${transId}, trying backups...`);
           this.backupDnsList.forEach(backupTarget => {
             this.sendUdpQuery(backupTarget, dnsPayload, socketV4);
           });
@@ -240,7 +230,6 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
         address: { address: dnsTarget, port: 53, family: 1 },
         data: dnsPayload
       }).catch((err: BusinessError) => {
-        // console.error(TAG, `Forward DNS failed: ${JSON.stringify(err)}`);
       });
     }
   }
@@ -262,19 +251,18 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
           family: 1
         },
         secureOptions: {
-          // verifyRemote: false // Skip verification for simplicity/compatibility
         }
       };
 
       tlsSocket.on('message', (value) => {
         // Simple handling: assume full response in one packet
         if (value.message.byteLength > 2) {
-           const respPayload = value.message.slice(2);
-           this.processDnsResponse(respPayload, sessionMap);
+          const respPayload = value.message.slice(2);
+          this.processDnsResponse(respPayload, sessionMap);
         }
         tlsSocket?.close();
       });
-      
+
       tlsSocket.on('error', (err) => {
         console.error(TAG, `DOT Socket error: ${JSON.stringify(err)}`);
         tlsSocket?.close();
@@ -285,13 +273,9 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
     } catch (e) {
       console.error(TAG, `DOT failed: ${JSON.stringify(e)}`);
       if (tlsSocket) {
-          tlsSocket.close();
+        tlsSocket.close();
       }
     }
-  }
-
-  private async sendDoqQuery(dnsTarget: string, dnsPayload: ArrayBuffer, sessionMap: Map<number, SessionInfo>) {
-     console.error(TAG, 'DOQ not supported yet');
   }
 
   private async sendDohQuery(dohUrl: string, dnsPayload: ArrayBuffer, sessionMap: Map<number, SessionInfo>) {
@@ -305,7 +289,7 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
             }
           }
         };
-        
+
         // 如果明确优先使用 HTTP/3，我们可以在这里尝试设置相关参数
         // 目前 rcp 主要依靠自动协商 (Alt-Svc)，但我们可以确保 connection pool 复用
         this.rcpSession = rcp.createSession(sessionConfig);
@@ -317,21 +301,21 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
         'content-type': 'application/dns-message',
         'accept': 'application/dns-message'
       };
-      
+
       // rcp 会根据服务端支持情况自动协商 HTTP/3 (QUIC) 或降级使用 HTTP/2 / HTTP/1.1
       const response = await this.rcpSession.fetch(request);
 
       if (response.statusCode === 200 && response.body) {
-          let resultBuffer: ArrayBuffer;
-          if (typeof response.body === 'string') {
-              console.warn(TAG, 'DoH response is string, unexpected');
-              return;
-          } else {
-              resultBuffer = response.body as ArrayBuffer;
-          }
-          this.processDnsResponse(resultBuffer, sessionMap);
+        let resultBuffer: ArrayBuffer;
+        if (typeof response.body === 'string') {
+          console.warn(TAG, 'DoH response is string, unexpected');
+          return;
+        } else {
+          resultBuffer = response.body as ArrayBuffer;
+        }
+        this.processDnsResponse(resultBuffer, sessionMap);
       } else {
-          console.error(TAG, `DoH (rcp) failed: ${response.statusCode}`);
+        console.error(TAG, `DoH (rcp) failed: ${response.statusCode}`);
       }
     } catch (err) {
       console.error(TAG, `DoH 查询失败: ${JSON.stringify(err)}`);
@@ -365,8 +349,28 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
   }
 
   private publishDnsCount() {
-    // 简单的限流，防止频繁发送事件，实际生产中可以按时间或数量聚合
-    // 但为了演示实时性，这里每次都发
+    const now = Date.now();
+    const THROTTLE_INTERVAL = 500; // 500ms 限流
+
+    if (now - this.lastPublishTime >= THROTTLE_INTERVAL) {
+      this.doPublishDnsCount();
+      this.lastPublishTime = now;
+      if (this.publishTimer !== -1) {
+        clearTimeout(this.publishTimer);
+        this.publishTimer = -1;
+      }
+    } else {
+      if (this.publishTimer === -1) {
+        this.publishTimer = setTimeout(() => {
+          this.doPublishDnsCount();
+          this.lastPublishTime = Date.now();
+          this.publishTimer = -1;
+        }, THROTTLE_INTERVAL - (now - this.lastPublishTime));
+      }
+    }
+  }
+
+  private doPublishDnsCount() {
     const options: commonEventManager.CommonEventPublishData = {
       parameters: {
         'count': this.dnsRequestCount
@@ -374,7 +378,6 @@ export default class MyVpnExtAbility extends VpnExtensionAbility {
     };
     commonEventManager.publish('site.chenwei.dns.event.DNS_COUNT_UPDATE', options, (err) => {
       if (err) {
-        // console.error(TAG, 'Publish DNS count failed');
       }
     });
   }

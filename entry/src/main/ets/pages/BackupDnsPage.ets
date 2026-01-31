@@ -1,7 +1,7 @@
 import { DnsInfo, DnsType } from '../model/DnsInfo';
 import { DnsDataManager } from '../utils/DnsDataManager';
 import { promptAction, router } from '@kit.ArkUI';
-import { CommonDeleteButton, CommonNavigationTitle, DnsTag } from '../component/CommonComponents';
+import { CommonNavigationTitle, DnsTag } from '../component/CommonComponents';
 
 @Entry
 @Component
@@ -13,6 +13,11 @@ struct BackupDnsPage {
 
   async aboutToAppear() {
     DnsDataManager.getInstance().init(getContext(this));
+  }
+
+  @Builder
+  NavigationTitle() {
+    CommonNavigationTitle({ title: '备用 DNS' })
   }
 
   @Builder
@@ -60,7 +65,6 @@ struct BackupDnsPage {
           ForEach(this.backupDnsList, (item: DnsInfo) => {
             ListItem() {
               Row() {
-                // 选中状态指示器
                 Radio({ value: item.id, group: 'backupDnsGroup' })
                   .checked(item.id === this.currentBackupDnsId)
                   .radioStyle({ checkedBackgroundColor: $r('app.color.brand_color') })
@@ -92,20 +96,32 @@ struct BackupDnsPage {
                 .alignItems(HorizontalAlign.Start)
                 .layoutWeight(1)
 
-                if (!item.isDefault) {
-                  Image($r('app.media.ic_public_edit'))
-                    .width($r('app.float.icon_size_secondary'))
-                    .height($r('app.float.icon_size_secondary'))
-                    .fillColor($r('app.color.icon_secondary'))
-                    .onClick(() => {
-                      router.pushUrl({
-                        url: 'pages/DnsEditPage',
-                        params: {
-                          id: item.id,
-                          isBackup: true
-                        }
-                      });
-                    })
+                if (!item.isDefault && item.id !== this.currentBackupDnsId) {
+                  Row() {
+                    Image($r('app.media.ic_public_edit'))
+                      .width($r('app.float.icon_size_secondary'))
+                      .height($r('app.float.icon_size_secondary'))
+                      .fillColor($r('app.color.brand_color'))
+                      .onClick(() => {
+                        router.pushUrl({
+                          url: 'pages/DnsEditPage',
+                          params: {
+                            id: item.id,
+                            isBackup: true
+                          }
+                        });
+                      })
+                    
+                    Image($r('app.media.ic_public_delete'))
+                      .width($r('app.float.icon_size_secondary'))
+                      .height($r('app.float.icon_size_secondary'))
+                      .fillColor($r('app.color.functional_red'))
+                      .margin({ left: 16 })
+                      .onClick(async () => {
+                        await DnsDataManager.getInstance().removeBackupDns(item.id);
+                        promptAction.showToast({ message: '删除成功' });
+                      })
+                  }
                 }
               }
               .width('100%')
@@ -116,17 +132,7 @@ struct BackupDnsPage {
                 DnsDataManager.getInstance().setCurrentBackupDnsId(item.id);
               })
             }
-            .swipeAction(item.isDefault ? undefined : {
-              end: () => {
-                CommonDeleteButton({
-                  onClickHandler: async () => {
-                    await DnsDataManager.getInstance().removeBackupDns(item.id);
-                    promptAction.showToast({ message: '删除成功' });
-                  }
-                })
-              }
-            })
-          }, (item: DnsInfo) => item.id)
+          }, (item: DnsInfo) => item.id + '_' + (item.id === this.currentBackupDnsId ? 'selected' : 'unselected'))
         }
         .width('100%')
         .height('100%')
@@ -134,9 +140,7 @@ struct BackupDnsPage {
         .backgroundColor($r('app.color.start_window_background'))
       }
     }
-    .title(() => {
-      CommonNavigationTitle({ title: '备用 DNS' })
-    })
+    .title(this.NavigationTitle())
     .menus(this.NavigationMenus())
     .titleMode(NavigationTitleMode.Mini)
     .width('100%')

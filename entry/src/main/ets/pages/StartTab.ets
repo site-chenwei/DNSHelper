@@ -1,7 +1,6 @@
-import { DnsInfo } from '../model/DnsInfo';
+import { DnsInfo, DnsTargetConfig } from '../model/DnsInfo';
 import { DnsDataManager } from '../utils/DnsDataManager';
 import { SettingsItem } from '../component/CommonComponents';
-import common from '@ohos.app.ability.common';
 import { vpnExtension } from '@kit.NetworkKit';
 import { Want } from '@kit.AbilityKit';
 import commonEventManager from '@ohos.commonEventManager';
@@ -26,13 +25,11 @@ struct WaveView {
   }
 
   startWaveAnimation() {
-    // 初始状态
     this.waveScale1 = 1;
     this.waveOpacity1 = 0.4;
     this.waveScale2 = 1;
     this.waveOpacity2 = 0.4;
-    
-    // 第一圈波纹
+
     animateTo({
       duration: 3000,
       curve: Curve.EaseOut,
@@ -43,7 +40,6 @@ struct WaveView {
       this.waveOpacity1 = 0;
     })
 
-    // 第二圈波纹，延迟1.5秒启动
     this.animationTimeoutId = setTimeout(() => {
       animateTo({
         duration: 3000,
@@ -87,12 +83,11 @@ export default struct StartTab {
   @StorageLink('vpnStartTime') vpnStartTime: number = 0;
   @State durationStr: string = '00:00:00';
   private timerId: number = -1;
-  @StorageProp('currentDnsId') @Watch('updateCurrentDnsName') currentDnsId: string = '';
+  @StorageLink('selectedDnsIds') @Watch('updateCurrentDnsName') selectedDnsIds: string[] = [];
   @StorageLink('dnsList') @Watch('updateCurrentDnsName') dnsList: DnsInfo[] = [];
   @State currentDnsName: string = '请选择 DNS';
   @State buttonScale: number = 1;
   @State dnsCount: number = 0;
-  
   private subscriber: commonEventManager.CommonEventSubscriber | null = null;
   @Link currentIndex: number;
 
@@ -152,7 +147,8 @@ export default struct StartTab {
     const h = Math.floor(diff / 3600);
     const m = Math.floor((diff % 3600) / 60);
     const s = diff % 60;
-    this.durationStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    this.durationStr =
+      `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   }
 
   subscribeToDnsStats() {
@@ -179,29 +175,27 @@ export default struct StartTab {
   }
 
   updateCurrentDnsName() {
-    console.info(`updateCurrentDnsName: currentDnsId=${this.currentDnsId}, dnsList.length=${this.dnsList.length}`);
-    const dns = this.dnsList.find(i => i.id === this.currentDnsId);
-    if (dns) {
-      this.currentDnsName = dns.name;
-      console.info(`Found DNS: ${dns.name}`);
-    } else {
+    if (this.selectedDnsIds.length === 0) {
       this.currentDnsName = '请选择 DNS';
-      console.info(`DNS not found for ID: ${this.currentDnsId}`);
+    } else if (this.selectedDnsIds.length === 1) {
+      const dns = this.dnsList.find(i => i.id === this.selectedDnsIds[0]);
+      this.currentDnsName = dns ? dns.name : '未知 DNS';
+    } else {
+      this.currentDnsName = `已启用 ${this.selectedDnsIds.length} 个服务`;
     }
   }
 
   async toggleRunning() {
-    if (!this.currentDnsId && !this.isRunning) {
+    if (this.selectedDnsIds.length === 0 && !this.isRunning) {
       // 如果没有选中且尝试启动，先尝试默认选中第一个
       if (this.dnsList.length > 0) {
-        await DnsDataManager.getInstance().setCurrentDnsId(this.dnsList[0].id);
+        await DnsDataManager.getInstance().toggleDnsId(this.dnsList[0].id);
       } else {
         // TODO: 提示用户添加配置
         return;
       }
     }
 
-    // 弹性缩放动画
     animateTo({ duration: 300, curve: Curve.Friction }, () => {
       this.buttonScale = 0.85;
     });
@@ -221,11 +215,14 @@ export default struct StartTab {
   }
 
   async startVpn() {
-    const selectedDns = this.dnsList.find(d => d.id === this.currentDnsId);
-    let dnsIps: string[] = ['223.5.5.5'];
-    if (selectedDns) {
-      dnsIps = [selectedDns.primaryDns];
-    }
+    const selectedDnsItems = this.dnsList.filter(d => this.selectedDnsIds.includes(d.id));
+
+    // 构建多 DNS 配置列表
+    const dnsConfigList: DnsTargetConfig[] = selectedDnsItems.map((item): DnsTargetConfig => ({
+      address: item.primaryDns,
+      type: item.type || 'UDP',
+      preferHttp3: item.preferHttp3 || false
+    }));
 
     // 获取备用 DNS 列表 (仅 UDP)
     const backupList = DnsDataManager.getInstance().getBackupDnsList();
@@ -242,10 +239,10 @@ export default struct StartTab {
     // 如果没有选中的（理论上应该有），或者是选中的不是UDP，或者其他异常情况
     // 降级策略：如果 backupIps 为空，但 backupList 有 UDP 节点，默认使用第一个 UDP 节点
     if (backupIps.length === 0 && backupList.length > 0) {
-       const firstUdp = backupList.find(d => d.type === 'UDP');
-       if (firstUdp) {
-         backupIps = [firstUdp.primaryDns];
-       }
+      const firstUdp = backupList.find(d => d.type === 'UDP');
+      if (firstUdp) {
+        backupIps = [firstUdp.primaryDns];
+      }
     }
 
     const want: Want = {
@@ -253,9 +250,7 @@ export default struct StartTab {
       bundleName: 'site.chenwei.dns',
       abilityName: 'MyVpnExtAbility',
       parameters: {
-        dnsList: dnsIps,
-        dnsType: selectedDns ? selectedDns.type : 'UDP',
-        preferHttp3: selectedDns ? (selectedDns.preferHttp3 || false) : false,
+        dnsConfigList: JSON.stringify(dnsConfigList),
         backupDnsList: backupIps
       }
     };
@@ -273,7 +268,7 @@ export default struct StartTab {
 
   async stopVpn() {
     const want: Want = {
-      deviceId:"",
+      deviceId: "",
       bundleName: 'site.chenwei.dns',
       abilityName: 'MyVpnExtAbility'
     };
@@ -285,67 +280,18 @@ export default struct StartTab {
     }
   }
 
-  showDnsSelector() {
-    if (this.dnsList.length === 0) {
-      return;
-    }
-
-    const dnsNames = this.dnsList.map(d => d.name);
-    const selectedIndex = this.dnsList.findIndex(d => d.id === this.currentDnsId);
-
-    TextPickerDialog.show({
-      range: dnsNames,
-      selected: selectedIndex >= 0 ? selectedIndex : 0,
-      onAccept: (value: TextPickerResult) => {
-        let index: number;
-        if (Array.isArray(value.index)) {
-          index = value.index[0];
-        } else {
-          index = value.index;
-        }
-
-        console.info(`DNS Selector onAccept: index=${index}, value=${JSON.stringify(value)}`);
-
-        if (index >= 0 && index < this.dnsList.length) {
-          const selectedId = this.dnsList[index].id;
-          console.info(`Switching DNS to: ${selectedId}`);
-          
-          // 使用 DnsDataManager 修改选中状态，不直接修改 @StorageProp
-          DnsDataManager.getInstance().setCurrentDnsId(selectedId).then(() => {
-             // 状态更新后，AppStorage 会通知 @StorageProp 更新，触发 @Watch
-             // 但为了更好的交互体验，可以手动调用一次 UI 刷新（虽然 @Watch 应该会处理）
-             console.info('DnsDataManager set completed');
-          });
-        }
-      }
-    });
-  }
-
   build() {
     Column() {
-      // 顶部标题区域
-      // Stack({ alignContent: Alignment.Center }) {
-      //   Text('DNS Helper')
-      //     .fontSize($r('app.float.text_size_title'))
-      //     .fontWeight(FontWeight.Bold)
-      //     .fontColor($r('app.color.text_primary'))
-      //     .textAlign(TextAlign.Center)
-      // }
-      // .width('100%')
-      // .height(44)
-      // .margin({ top: 10, bottom: 10 })
-
       // 中间大按钮区域
       Column() {
         Stack({ alignContent: Alignment.Center }) {
-          // 呼吸波纹层 - 使用条件渲染控制挂载/卸载
           if (this.isRunning) {
             WaveView()
               .transition(TransitionEffect.OPACITY.animation({ duration: 300 }))
           }
-          
+
           Button() {
-            Image($r('app.media.ic_power')) 
+            Image($r('app.media.ic_power'))
               .width($r('app.float.start_icon_size'))
               .height($r('app.float.start_icon_size'))
               .fillColor($r('app.color.text_white'))
@@ -354,13 +300,17 @@ export default struct StartTab {
           .height($r('app.float.start_button_size'))
           .borderRadius($r('app.float.start_button_radius'))
           .backgroundColor(this.isRunning ? $r('app.color.brand_color') : $r('app.color.button_inactive_bg'))
-          .shadow({ radius: 20, color: this.isRunning ? $r('app.color.brand_shadow_active') : $r('app.color.card_shadow'), offsetY: 10 })
+          .shadow({
+            radius: 20,
+            color: this.isRunning ? $r('app.color.brand_shadow_active') : $r('app.color.card_shadow'),
+            offsetY: 10
+          })
           .scale({ x: this.buttonScale, y: this.buttonScale })
           .onClick(() => {
             this.toggleRunning();
           })
         }
-        .width(260) // 给波纹扩散留出空间
+        .width(260)
         .height(260)
         .alignContent(Alignment.Center)
 
@@ -369,7 +319,7 @@ export default struct StartTab {
           .fontColor($r('app.color.text_primary'))
           .fontWeight(FontWeight.Medium)
           .margin({ top: 8 })
-        
+
         Text(this.isRunning ? `已运行 ${this.durationStr}` : '未连接')
           .fontSize($r('app.float.text_size_small'))
           .fontColor($r('app.color.text_secondary'))
@@ -378,7 +328,6 @@ export default struct StartTab {
       .flexGrow(1)
       .justifyContent(FlexAlign.Center)
 
-      // 底部功能列表
       Column() {
         List() {
           ListItem() {
@@ -388,10 +337,10 @@ export default struct StartTab {
                 value: this.currentDnsName,
                 showArrow: true,
                 onClickHandler: () => {
-                  this.showDnsSelector();
+                  this.currentIndex = 1;
                 }
               })
-              
+
               if (this.isRunning) {
                 Divider().color($r('app.color.divider_color')).strokeWidth(0.5).margin({ left: 16, right: 16 })
 
