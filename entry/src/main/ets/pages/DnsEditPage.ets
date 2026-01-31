@@ -54,7 +54,7 @@ struct DnsEditPage {
 
   async save() {
     if (this.name && this.primaryDns) {
-      if (!Validator.isValidIp(this.primaryDns)) {
+      if (!Validator.isValidIp(this.primaryDns, this.selectedType)) {
         promptAction.showToast({ message: 'DNS 格式不正确' });
         return;
       }
@@ -106,8 +106,7 @@ struct DnsEditPage {
               InputCell({
                 title: '名称',
                 placeholder: '请输入服务名称',
-                value: this.name,
-                onChange: (val) => { this.name = val; }
+                value: $name
               })
               Divider()
                 .color($r('app.color.divider_color'))
@@ -129,8 +128,7 @@ struct DnsEditPage {
                     .padding({ left: 16 })
                   SwitchCell({
                     title: '优先使用 HTTP/3',
-                    isOn: this.preferHttp3,
-                    onChange: (isOn) => { this.preferHttp3 = isOn; }
+                    isOn: $preferHttp3
                   })
                 }
               } else {
@@ -151,8 +149,7 @@ struct DnsEditPage {
               InputCell({
                 title: 'DNS',
                 placeholder: '请输入DNS地址',
-                value: this.primaryDns,
-                onChange: (val) => { this.primaryDns = val; }
+                value: $primaryDns
               })
             }
             .width('100%')
