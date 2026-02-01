@@ -43,7 +43,7 @@ export default struct SettingsTab {
                .fontSize($r('app.float.text_size_micro'))
                .fontColor($r('app.color.text_tertiary'))
                .width('100%')
-               .padding({ left: 16, right: 16 })
+               .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
            }
           ListItem() {
             SettingsItem({
@@ -54,7 +54,7 @@ export default struct SettingsTab {
             })
           }
         }
-        .padding({ left: 16, right: 16, top: 16, bottom: 16 })
+        .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg'), top: $r('app.float.space_lg'), bottom: $r('app.float.space_lg') })
         .width('100%')
         .height('100%')
       }

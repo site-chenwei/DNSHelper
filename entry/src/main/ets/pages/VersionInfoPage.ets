@@ -1,4 +1,3 @@
-import { router } from '@kit.ArkUI';
 import { CommonNavigationTitle } from '../component/CommonComponents';
 
 @Entry
@@ -19,22 +18,22 @@ struct VersionInfoPage {
       Column() {
         Blank().height(60)
 
-        Image($r('app.media.startIcon'))
+        Image($r('app.media.icon_modern'))
           .width($r('app.float.app_icon_size_large'))
           .height($r('app.float.app_icon_size_large'))
           .borderRadius(16)
-          .margin({ bottom: 16 })
+          .margin({ bottom: $r('app.float.space_lg') })
 
         Text(this.appName)
           .fontSize($r('app.float.text_size_large_title'))
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary'))
-          .margin({ bottom: 8 })
+          .margin({ bottom: $r('app.float.space_sm') })
 
         Text(`Version ${this.versionName}`)
           .fontSize($r('app.float.text_size_body'))
           .fontColor($r('app.color.text_secondary'))
-          .margin({ bottom: 40 })
+          .margin({ bottom: $r('app.float.space_huge') })
 
       }
       .width('100%')

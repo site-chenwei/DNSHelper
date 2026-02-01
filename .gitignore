@@ -10,3 +10,7 @@
 /.clang-tidy
 **/.test
 /.appanalyzer
+/cer
+*.p12
+*.csr
+*.jks

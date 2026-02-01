@@ -318,12 +318,12 @@ export default struct StartTab {
           .fontSize($r('app.float.text_size_sub_title'))
           .fontColor($r('app.color.text_primary'))
           .fontWeight(FontWeight.Medium)
-          .margin({ top: 8 })
+          .margin({ top: $r('app.float.space_sm') })
 
         Text(this.isRunning ? `已运行 ${this.durationStr}` : '未连接')
           .fontSize($r('app.float.text_size_small'))
           .fontColor($r('app.color.text_secondary'))
-          .margin({ top: 8 })
+          .margin({ top: $r('app.float.space_sm') })
       }
       .flexGrow(1)
       .justifyContent(FlexAlign.Center)
@@ -342,7 +342,7 @@ export default struct StartTab {
               })
 
               if (this.isRunning) {
-                Divider().color($r('app.color.divider_color')).strokeWidth(0.5).margin({ left: 16, right: 16 })
+                Divider().color($r('app.color.divider_color')).strokeWidth(0.5).margin({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
 
                 SettingsItem({
                   title: '已处理请求',
@@ -359,7 +359,7 @@ export default struct StartTab {
         .width('100%')
       }
       .width('100%')
-      .padding({ left: 16, right: 16, bottom: 16 })
+      .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg'), bottom: $r('app.float.space_lg') })
     }
     .width('100%')
     .height('100%')

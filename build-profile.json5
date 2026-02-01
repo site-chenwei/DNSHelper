@@ -2,23 +2,36 @@
   "app": {
     "signingConfigs": [
       {
-        "name": "default",
+        "name": "release",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "C:\\Users\\cw\\.ohos\\config\\default_DNSHelper_Hr8Pa6-QAwJzcY8zjnzlEagXVlZS7w77Va9uwXrRuA8=.cer",
-          "keyAlias": "debugKey",
-          "keyPassword": "0000001B6618FFD6D9F05397898AD2D4D9567C53E5A7EC36186AEE16D8E281B2C39ACC526A1DD5242014DF",
-          "profile": "C:\\Users\\cw\\.ohos\\config\\default_DNSHelper_Hr8Pa6-QAwJzcY8zjnzlEagXVlZS7w77Va9uwXrRuA8=.p7b",
+          "certpath": "/cer/发布证书.cer",
+          "keyAlias": "prod",
+          "keyPassword": "0000001EDC418878669B117C4AD6139A6A024BBEA793EC0AD3072E62590587ABD114B8E09AF4C099B0A55D23A476",
+          "profile": "/cer/prodRelease.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "C:\\Users\\cw\\.ohos\\config\\default_DNSHelper_Hr8Pa6-QAwJzcY8zjnzlEagXVlZS7w77Va9uwXrRuA8=.p12",
-          "storePassword": "0000001BC50DBE5F71A1E5DAF778B8DA540B2DA9655AE1EEEC3D84FD058FB7F3624AD09A3C340B4235963C"
+          "storeFile": "/cer/dns_helper.p12",
+          "storePassword": "0000001E5CBC00DF7DE5D0785CF5F82422C02967E76F3CB3C41001E54AAC486BF0925A593C86047BD57BD34F1968"
+        }
+      },
+      {
+        "name": "debug",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:/Users/cw/.ohos/config/debug_DNSHelper_Hr8Pa6-QAwJzcY8zjnzlEagXVlZS7w77Va9uwXrRuA8=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001B56959DBE410ADE5376FC8AD4E6E74F5EA3F158FFEB144AC35A6FDC82308CC2F876C25DF48D76A4",
+          "profile": "C:/Users/cw/.ohos/config/debug_DNSHelper_Hr8Pa6-QAwJzcY8zjnzlEagXVlZS7w77Va9uwXrRuA8=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:/Users/cw/.ohos/config/debug_DNSHelper_Hr8Pa6-QAwJzcY8zjnzlEagXVlZS7w77Va9uwXrRuA8=.p12",
+          "storePassword": "0000001B3D7C31E36EA0FD46819840B2E4AED6B5CC1A08DADD83E62C30369C190C3E046D421CF5CCB8741E"
         }
       }
     ],
     "products": [
       {
         "name": "default",
-        "signingConfig": "default",
+        "signingConfig": "debug",
         "targetSdkVersion": "6.0.2(22)",
         "compatibleSdkVersion": "6.0.2(22)",
         "runtimeOS": "HarmonyOS",
@@ -27,7 +40,7 @@
             "caseSensitiveCheck": true,
             "useNormalizedOHMUrl": true
           }
-        }
+        },
       }
     ],
     "buildModeSet": [

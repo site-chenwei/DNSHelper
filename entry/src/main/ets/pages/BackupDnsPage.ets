@@ -36,7 +36,7 @@ struct BackupDnsPage {
         });
       })
       .backgroundColor(Color.Transparent)
-      .padding({ right: 16 })
+      .padding({ right: $r('app.float.space_lg') })
     }
     .height('100%')
     .justifyContent(FlexAlign.End)
@@ -51,7 +51,7 @@ struct BackupDnsPage {
             .width($r('app.float.empty_icon_size'))
             .height($r('app.float.empty_icon_size'))
             .opacity(0.1)
-            .margin({ bottom: 20 })
+            .margin({ bottom: $r('app.float.space_xl') })
           Text('暂无备用 DNS')
             .fontSize($r('app.float.text_size_body'))
             .fontColor($r('app.color.text_secondary'))
@@ -73,7 +73,7 @@ struct BackupDnsPage {
                       DnsDataManager.getInstance().setCurrentBackupDnsId(item.id);
                     }
                   })
-                  .margin({ right: 12 })
+                  .margin({ right: $r('app.float.space_md') })
 
                 Column() {
                   Row() {
@@ -87,7 +87,7 @@ struct BackupDnsPage {
                       isDefault: item.isDefault
                     })
                   }
-                  .margin({ bottom: 4 })
+                  .margin({ bottom: $r('app.float.space_xs') })
 
                   Text(item.primaryDns)
                     .fontSize($r('app.float.text_size_small'))
@@ -116,7 +116,7 @@ struct BackupDnsPage {
                       .width($r('app.float.icon_size_secondary'))
                       .height($r('app.float.icon_size_secondary'))
                       .fillColor($r('app.color.functional_red'))
-                      .margin({ left: 16 })
+                      .margin({ left: $r('app.float.space_lg') })
                       .onClick(async () => {
                         await DnsDataManager.getInstance().removeBackupDns(item.id);
                         promptAction.showToast({ message: '删除成功' });
@@ -125,7 +125,7 @@ struct BackupDnsPage {
                 }
               }
               .width('100%')
-              .padding(16)
+              .padding($r('app.float.space_lg'))
               .backgroundColor($r('app.color.card_background'))
               .borderRadius(12)
               .onClick(() => {
@@ -136,7 +136,7 @@ struct BackupDnsPage {
         }
         .width('100%')
         .height('100%')
-        .padding({ left: 16, right: 16, top: 16, })
+        .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg'), top: $r('app.float.space_lg'), })
         .backgroundColor($r('app.color.start_window_background'))
       }
     }

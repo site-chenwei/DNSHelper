@@ -15,7 +15,7 @@ export struct SettingsItem {
         Image(this.icon)
           .width($r('app.float.icon_size_secondary'))
           .height($r('app.float.icon_size_secondary'))
-          .margin({ right: 12 })
+          .margin({ right: $r('app.float.space_md') })
           .fillColor($r('app.color.text_primary'))
       }
 
@@ -28,7 +28,7 @@ export struct SettingsItem {
         Text(this.value)
           .fontSize($r('app.float.text_size_small'))
           .fontColor($r('app.color.text_secondary'))
-          .margin({ right: 4 })
+          .margin({ right: $r('app.float.space_xs') })
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .constraintSize({ maxWidth: '50%' })
@@ -43,7 +43,7 @@ export struct SettingsItem {
     }
     .width('100%')
     .height($r('app.float.list_item_height'))
-    .padding({ left: 16, right: 16 })
+    .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
     .backgroundColor($r('app.color.card_background'))
     .borderRadius(12)
     .onClick(() => {
@@ -85,7 +85,7 @@ export struct CommonNavigationTitle {
     }
     .height('100%')
     .justifyContent(FlexAlign.Center)
-    .padding({ left: 16 })
+    .padding({ left: $r('app.float.space_lg') })
   }
 }
 
@@ -101,13 +101,13 @@ export struct DnsTag {
         .fontColor(UiUtils.getDnsTypeColor(this.type))
         .backgroundColor(UiUtils.getDnsTypeBgColor(this.type))
         .padding({
-          left: 6,
-          right: 6
+          left: $r('app.float.space_xs'),
+          right: $r('app.float.space_xs')
         })
         .textVerticalAlign(TextVerticalAlign.CENTER)
         .height(16)
         .borderRadius(4)
-        .margin({ left: 8 })
+        .margin({ left: $r('app.float.space_sm') })
 
       if (this.isDefault) {
         Text('默认')
@@ -115,26 +115,26 @@ export struct DnsTag {
           .fontColor($r('app.color.brand_color'))
           .backgroundColor($r('app.color.status_active_bg'))
           .padding({
-            left: 6,
-            right: 6
+            left: $r('app.float.space_xs'),
+            right: $r('app.float.space_xs')
           })
           .textVerticalAlign(TextVerticalAlign.CENTER)
           .height(16)
           .borderRadius(4)
-          .margin({ left: 8 })
+          .margin({ left: $r('app.float.space_sm') })
       } else {
         Text('自定义')
           .fontSize($r('app.float.text_size_tag'))
           .fontColor($r('app.color.tag_custom_text'))
           .backgroundColor($r('app.color.tag_custom_bg'))
           .padding({
-            left: 6,
-            right: 6
+            left: $r('app.float.space_xs'),
+            right: $r('app.float.space_xs')
           })
           .textVerticalAlign(TextVerticalAlign.CENTER)
           .height(16)
           .borderRadius(4)
-          .margin({ left: 8 })
+          .margin({ left: $r('app.float.space_sm') })
       }
     }
     .alignItems(VerticalAlign.Center)
@@ -168,7 +168,7 @@ export struct InputCell {
     }
     .width('100%')
     .height($r('app.float.list_item_height'))
-    .padding({ left: 16, right: 16 })
+    .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
     .backgroundColor($r('app.color.card_background'))
   }
 }
@@ -195,7 +195,7 @@ export struct SwitchCell {
     }
     .width('100%')
     .height($r('app.float.list_item_height'))
-    .padding({ left: 16, right: 16 })
+    .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
     .backgroundColor($r('app.color.card_background'))
   }
 }
@@ -239,7 +239,7 @@ export struct SelectCell {
     }
     .width('100%')
     .height($r('app.float.list_item_height'))
-    .padding({ left: 16, right: 0 })
+    .padding({ left: $r('app.float.space_lg'), right: 0 })
     .backgroundColor($r('app.color.card_background'))
   }
 }

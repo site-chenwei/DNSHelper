@@ -32,7 +32,7 @@ export default struct ConfigTab {
         router.pushUrl({ url: 'pages/DnsEditPage' });
       })
       .backgroundColor(Color.Transparent)
-      .padding({ right: 16 })
+      .padding({ right: $r('app.float.space_lg') })
     }
     .height('100%')
     .justifyContent(FlexAlign.End)
@@ -47,13 +47,13 @@ export default struct ConfigTab {
             .width(16)
             .height(16)
             .fillColor($r('app.color.text_secondary'))
-            .margin({ right: 8 })
+            .margin({ right: $r('app.float.space_sm') })
           Text('支持多选，将并发请求所有选中的DNS服务')
             .fontSize($r('app.float.text_size_small'))
             .fontColor($r('app.color.text_secondary'))
         }
         .width('100%')
-        .padding({ left: 16, right: 16, top: 16})
+        .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg'), top: $r('app.float.space_lg')})
         .alignItems(VerticalAlign.Center)
 
         List({ space: 12 }) {
@@ -67,7 +67,7 @@ export default struct ConfigTab {
                     .hitTestBehavior(HitTestMode.None)
                 }
                 .justifyContent(FlexAlign.Center)
-                .padding({ left: 16, right: 8 })
+                .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_sm') })
 
                 Column() {
                   Row() {
@@ -88,7 +88,7 @@ export default struct ConfigTab {
                       Text(item.primaryDns)
                       .fontSize($r('app.float.text_size_small'))
                       .fontColor($r('app.color.text_secondary'))
-                      .margin({ top: 6 })
+                      .margin({ top: $r('app.float.space_xs') })
                       .textOverflow({ overflow: TextOverflow.Ellipsis })
                       .maxLines(1)
                     }
@@ -110,7 +110,7 @@ export default struct ConfigTab {
                                 }
                               })
                             })
-                            .margin({ right: 16 })
+                            .margin({ right: $r('app.float.space_lg') })
                         }
                         
                         Image($r('app.media.ic_public_delete'))
@@ -122,14 +122,14 @@ export default struct ConfigTab {
                              promptAction.showToast({ message: '删除成功' });
                           })
                       }
-                      .padding({ left: 4 })
+                      .padding({ left: $r('app.float.space_xs') })
                     }
                   }
                   .width('100%')
                   .alignItems(VerticalAlign.Center)
                 }
                 .layoutWeight(1)
-                .padding({ top: 16, bottom: 16, right: 16 })
+                .padding({ top: $r('app.float.space_lg'), bottom: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
                 .justifyContent(FlexAlign.Center)
               }
               .width('100%')
@@ -146,7 +146,7 @@ export default struct ConfigTab {
         }
         .width('100%')
         .layoutWeight(1)
-        .padding({ top: 16, left: 16, right: 16, bottom: 16 })
+        .padding({ top: $r('app.float.space_lg'), left: $r('app.float.space_lg'), right: $r('app.float.space_lg'), bottom: $r('app.float.space_lg') })
         .backgroundColor($r('app.color.start_window_background'))
       }
       .width('100%')

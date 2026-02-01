@@ -46,7 +46,7 @@ struct Index {
           .fontColor(this.currentIndex === targetIndex ? $r('app.color.brand_color') : $r('app.color.text_secondary'))
           .fontSize($r('app.float.text_size_small'))
           .fontWeight($r('app.integer.font_weight_medium'))
-          .margin({ top: 2 })
+          .margin({ top: $r('app.float.space_xs') })
       }
       .width('100%')
       .height($r('app.float.tab_bar_height'))
@@ -55,7 +55,7 @@ struct Index {
     }
     .width('100%')
     .height(56 + this.bottomSafeHeight)
-    .padding({ bottom: this.bottomSafeHeight + 5, top: 5 })
+    .padding({ bottom: this.bottomSafeHeight + 4, top: $r('app.float.tab_bar_padding') })
     .justifyContent(FlexAlign.SpaceBetween)
     .backgroundColor($r('app.color.tab_bar_background'))
     .border({ width: { top: $r('app.float.tab_bar_border_width') }, color: $r('app.color.divider_color') })

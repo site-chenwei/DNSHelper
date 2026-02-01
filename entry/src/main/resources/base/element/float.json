@@ -74,11 +74,47 @@
     },
     {
       "name": "tab_bar_padding",
-      "value": "5vp"
+      "value": "4vp"
     },
     {
       "name": "tab_bar_border_width",
       "value": "0.5vp"
+    },
+    {
+      "name": "space_xs",
+      "value": "4vp"
+    },
+    {
+      "name": "space_sm",
+      "value": "8vp"
+    },
+    {
+      "name": "space_md",
+      "value": "12vp"
+    },
+    {
+      "name": "space_lg",
+      "value": "16vp"
+    },
+    {
+      "name": "space_xl",
+      "value": "20vp"
+    },
+    {
+      "name": "space_xxl",
+      "value": "24vp"
+    },
+    {
+      "name": "space_xxxl",
+      "value": "32vp"
+    },
+    {
+      "name": "space_huge",
+      "value": "40vp"
+    },
+    {
+      "name": "space_max",
+      "value": "48vp"
     }
   ]
 }

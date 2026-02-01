@@ -95,7 +95,7 @@ struct DnsEditPage {
         .fontSize($r('app.float.text_size_body'))
         .fontColor($r('app.color.brand_color'))
         .backgroundColor(Color.Transparent)
-        .padding({ right: 16 })
+        .padding({ right: $r('app.float.space_lg') })
     }
     .height('100%')
     .justifyContent(FlexAlign.End)
@@ -116,7 +116,7 @@ struct DnsEditPage {
               Divider()
                 .color($r('app.color.divider_color'))
                 .strokeWidth(0.5)
-                .padding({ left: 16 })
+                .padding({ left: $r('app.float.space_lg') })
 
               if (!this.isBackupMode) {
                 SelectCell({
@@ -130,7 +130,7 @@ struct DnsEditPage {
                   Divider()
                     .color($r('app.color.divider_color'))
                     .strokeWidth(0.5)
-                    .padding({ left: 16 })
+                    .padding({ left: $r('app.float.space_lg') })
                   SwitchCell({
                     title: '优先使用 HTTP/3',
                     isOn: $preferHttp3
@@ -148,7 +148,7 @@ struct DnsEditPage {
               Divider()
                 .color($r('app.color.divider_color'))
                 .strokeWidth(0.5)
-                .padding({ left: 16 })
+                .padding({ left: $r('app.float.space_lg') })
 
               InputCell({
                 title: 'DNS',
@@ -161,12 +161,12 @@ struct DnsEditPage {
             .clip(true)
             .backgroundColor($r('app.color.card_background'))
           }
-          .padding({ left: 16, right: 16 })
+          .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
         }
         .width('100%')
         .layoutWeight(1)
-        .margin({ top: 16 })
-        .padding({ bottom: 16 })
+        .margin({ top: $r('app.float.space_lg') })
+        .padding({ bottom: $r('app.float.space_lg') })
       }
       .width('100%')
       .height('100%')
