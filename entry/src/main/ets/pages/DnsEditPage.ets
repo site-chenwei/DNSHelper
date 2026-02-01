@@ -1,35 +1,34 @@
 import { DnsInfo, DnsType } from '../model/DnsInfo';
-import { router } from '@kit.ArkUI';
+import { AppStorageV2 } from '@kit.ArkUI';
 import { DnsDataManager } from '../utils/DnsDataManager';
 import { promptAction } from '@kit.ArkUI';
-import { CommonNavigationTitle, InputCell, SelectCell, SwitchCell } from '../component/CommonComponents';
+import { InputCell, SelectCell, SwitchCell } from '../component/CommonComponents';
 import { Validator } from '../utils/UiUtils';
+import { HdsNavDestination, HdsListItemCard } from '../component/HdsComponents';
 
-@Entry
-@Component
-struct DnsEditPage {
-  @State name: string = '';
-  @State primaryDns: string = '';
-  @State selectedType: DnsType = DnsType.UDP;
-  @State preferHttp3: boolean = false;
-  @State isEditMode: boolean = false;
-  @State isBackupMode: boolean = false;
-  @State currentId: string = '';
-  @StorageProp('topSafeHeight') topSafeHeight: number = 0;
-  @StorageProp('bottomSafeHeight') bottomSafeHeight: number = 0;
+@ComponentV2
+export default struct DnsEditPage {
+  @Param params: Record<string, Object> = {};
+  @Local name: string = '';
+  @Local primaryDns: string = '';
+  @Local selectedType: DnsType = DnsType.UDP;
+  @Local preferHttp3: boolean = false;
+  @Local isEditMode: boolean = false;
+  @Local isBackupMode: boolean = false;
+  @Local currentId: string = '';
+  @Local navPathStack: NavPathStack = AppStorageV2.connect(NavPathStack, 'navPathStack', () => new NavPathStack())!;
 
   async aboutToAppear() {
     DnsDataManager.getInstance().init(getContext(this));
-    const params = router.getParams() as Record<string, Object>;
-
-    if (params) {
-      if (params['isBackup']) {
-        this.isBackupMode = params['isBackup'] as boolean;
+    
+    if (this.params) {
+      if (this.params['isBackup']) {
+        this.isBackupMode = this.params['isBackup'] as boolean;
       }
 
-      if (params['id']) {
+      if (this.params['id']) {
         this.isEditMode = true;
-        this.currentId = params['id'] as string;
+        this.currentId = this.params['id'] as string;
 
         let list: DnsInfo[] = [];
         if (this.isBackupMode) {
@@ -76,15 +75,10 @@ struct DnsEditPage {
         }
         promptAction.showToast({ message: '添加成功' });
       }
-      router.back();
+      this.navPathStack.pop();
     } else {
       promptAction.showToast({ message: '请填写完整信息' });
     }
-  }
-
-  @Builder
-  NavigationTitle() {
-    CommonNavigationTitle({ title: this.isEditMode ? '编辑 DNS' : '添加 DNS' })
   }
 
   @Builder
@@ -103,15 +97,18 @@ struct DnsEditPage {
   }
 
   build() {
-    Navigation() {
+    HdsNavDestination({ title: this.isEditMode ? '编辑 DNS' : '添加 DNS', menus: this.NavigationMenus }) {
       Column() {
         List() {
-          ListItem() {
-            Column() {
+          HdsListItemCard() {
+             Column() {
               InputCell({
                 title: '名称',
-                placeholder: '请输入服务名称',
-                value: $name
+                placeholder: '请输入名称',
+                value: this.name,
+                onChange: (val) => {
+                  this.name = val;
+                }
               })
               Divider()
                 .color($r('app.color.divider_color'))
@@ -133,7 +130,10 @@ struct DnsEditPage {
                     .padding({ left: $r('app.float.space_lg') })
                   SwitchCell({
                     title: '优先使用 HTTP/3',
-                    isOn: $preferHttp3
+                    isOn: this.preferHttp3,
+                    onChange: (isOn) => {
+                      this.preferHttp3 = isOn;
+                    }
                   })
                 }
               } else {
@@ -153,15 +153,13 @@ struct DnsEditPage {
               InputCell({
                 title: 'DNS',
                 placeholder: '请输入DNS地址',
-                value: $primaryDns
+                value: this.primaryDns,
+                onChange: (val) => {
+                  this.primaryDns = val;
+                }
               })
             }
-            .width('100%')
-            .borderRadius(12)
-            .clip(true)
-            .backgroundColor($r('app.color.card_background'))
           }
-          .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
         }
         .width('100%')
         .layoutWeight(1)
@@ -172,12 +170,5 @@ struct DnsEditPage {
       .height('100%')
       .backgroundColor($r('app.color.start_window_background'))
     }
-    .title(this.NavigationTitle())
-    .titleMode(NavigationTitleMode.Mini)
-    .menus(this.NavigationMenus())
-    .width('100%')
-    .height('100%')
-    .backgroundColor($r('app.color.tab_bar_background'))
-    .padding({ top: this.topSafeHeight })
   }
 }

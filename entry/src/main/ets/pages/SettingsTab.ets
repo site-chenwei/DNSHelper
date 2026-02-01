@@ -1,13 +1,15 @@
 import { router } from '@kit.ArkUI';
 import { SettingsItem, CommonNavigationTitle } from '../component/CommonComponents';
 import { DnsInfo } from '../model/DnsInfo';
+import { AppStorageV2 } from '@kit.ArkUI';
 
-@Component
+@ComponentV2
 export default struct SettingsTab {
-  @StorageProp('topSafeHeight') topSafeHeight: number = 0;
-  @StorageProp('bottomSafeHeight') bottomSafeHeight: number = 0;
-  @StorageLink('backupDnsList') backupDnsList: DnsInfo[] = [];
-  @StorageLink('currentBackupDnsId') currentBackupDnsId: string = '';
+  @Local topSafeHeight: number = AppStorageV2.connect(Number, 'topSafeHeight', () => 0)!;
+  @Local bottomSafeHeight: number = AppStorageV2.connect(Number, 'bottomSafeHeight', () => 0)!;
+  @Local backupDnsList: DnsInfo[] = AppStorageV2.connect(Array, 'backupDnsList', () => [])!;
+  @Local currentBackupDnsId: string = AppStorageV2.connect(String, 'currentBackupDnsId', () => '')!;
+  @Local navPathStack: NavPathStack = AppStorageV2.connect(NavPathStack, 'navPathStack', () => new NavPathStack())!;
 
   getBackupDnsSummary(): string {
     if (!this.backupDnsList || this.backupDnsList.length === 0) {
@@ -17,7 +19,11 @@ export default struct SettingsTab {
     if (selected) {
       return selected.name;
     }
-    return this.backupDnsList[0].name;
+    // Fallback if ID not found but list has items
+    if (this.backupDnsList.length > 0) {
+       return this.backupDnsList[0].name;
+    }
+    return '未配置';
   }
 
   @Builder
@@ -26,48 +32,53 @@ export default struct SettingsTab {
   }
 
   build() {
-    Navigation() {
-      Column() {
-        List({ space: 12 }) {
-          ListItem() {
-            SettingsItem({
-              title: '备用服务器',
-              value: this.getBackupDnsSummary(),
-              onClickHandler: () => {
-                router.pushUrl({ url: 'pages/BackupDnsPage' });
-              }
-            })
-          }
-          ListItem() {
-             Text('当主服务器解析失败时会使用备用服务器进行解析')
-               .fontSize($r('app.float.text_size_micro'))
-               .fontColor($r('app.color.text_tertiary'))
-               .width('100%')
-               .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
-           }
-          ListItem() {
-            SettingsItem({
-              title: '关于',
-              onClickHandler: () => {
-                router.pushUrl({ url: 'pages/VersionInfoPage' });
-              }
-            })
-          }
-        }
-        .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg'), top: $r('app.float.space_lg'), bottom: $r('app.float.space_lg') })
-        .width('100%')
-        .height('100%')
+    Column() {
+      // 标题栏
+      Row() {
+        this.NavigationTitle()
       }
       .width('100%')
+      .padding({ top: this.topSafeHeight })
+      .backgroundColor($r('app.color.tab_bar_background'))
+
+      List({ space: 12 }) {
+        HdsListItemCard({
+          onClick: () => {
+            this.navPathStack.pushPath({ name: 'BackupDnsPage' });
+          }
+        }) {
+          SettingsItem({
+            title: '备用服务器',
+            value: this.getBackupDnsSummary(),
+            showArrow: true
+          })
+        }
+
+        ListItem() {
+           Text('当主服务器解析失败时会使用备用服务器进行解析')
+             .fontSize($r('app.float.text_size_micro'))
+             .fontColor($r('app.color.text_tertiary'))
+             .width('100%')
+             .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
+         }
+
+        HdsListItemCard({
+          onClick: () => {
+            this.navPathStack.pushPath({ name: 'VersionInfoPage' });
+          }
+        }) {
+          SettingsItem({
+            title: '关于',
+            showArrow: true
+          })
+        }
+      }
+      .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg'), top: $r('app.float.space_lg'), bottom: $r('app.float.space_lg') })
+      .width('100%')
       .layoutWeight(1)
-      .backgroundColor($r('app.color.start_window_background'))
     }
-    .title(this.NavigationTitle())
-    .titleMode(NavigationTitleMode.Mini)
-    .hideBackButton(true)
     .width('100%')
     .height('100%')
-    .backgroundColor($r('app.color.tab_bar_background'))
-    .padding({ top: this.topSafeHeight })
+    .backgroundColor($r('app.color.start_window_background'))
   }
 }

@@ -10,13 +10,14 @@ export interface DnsTargetConfig {
   preferHttp3: boolean;
 }
 
+@ObservedV2
 export class DnsInfo {
-  id: string;
-  name: string;
-  primaryDns: string;
-  isDefault: boolean;
-  type: DnsType;
-  preferHttp3: boolean; // 新增字段：是否优先使用 HTTP/3
+  @Trace id: string;
+  @Trace name: string;
+  @Trace primaryDns: string;
+  @Trace isDefault: boolean;
+  @Trace type: DnsType;
+  @Trace preferHttp3: boolean; // 新增字段：是否优先使用 HTTP/3
 
   constructor(name: string, primaryDns: string, isDefault: boolean = false, type: DnsType = DnsType.UDP,
     preferHttp3: boolean = false) {
@@ -27,6 +28,12 @@ export class DnsInfo {
     this.type = type;
     this.preferHttp3 = preferHttp3;
   }
+}
+
+@ObservedV2
+export class AppState {
+  @Trace isRunning: boolean = false;
+  @Trace vpnStartTime: number = 0;
 }
 
 export const DEFAULT_DNS_LIST: DnsInfo[] = [

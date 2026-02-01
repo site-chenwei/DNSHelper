@@ -1,16 +1,17 @@
-import { DnsInfo, DnsTargetConfig } from '../model/DnsInfo';
+import { DnsInfo, DnsTargetConfig, AppState } from '../model/DnsInfo';
 import { DnsDataManager } from '../utils/DnsDataManager';
 import { SettingsItem } from '../component/CommonComponents';
 import { vpnExtension } from '@kit.NetworkKit';
 import { Want } from '@kit.AbilityKit';
 import commonEventManager from '@ohos.commonEventManager';
+import { AppStorageV2 } from '@kit.ArkUI';
 
-@Component
+@ComponentV2
 struct WaveView {
-  @State waveScale1: number = 1;
-  @State waveOpacity1: number = 0;
-  @State waveScale2: number = 1;
-  @State waveOpacity2: number = 0;
+  @Local waveScale1: number = 1;
+  @Local waveOpacity1: number = 0;
+  @Local waveScale2: number = 1;
+  @Local waveOpacity2: number = 0;
   private animationTimeoutId: number = -1;
 
   aboutToAppear() {
@@ -75,48 +76,30 @@ struct WaveView {
   }
 }
 
-@Component
-export default struct StartTab {
-  @StorageProp('topSafeHeight') topSafeHeight: number = 0;
-  @StorageProp('bottomSafeHeight') bottomSafeHeight: number = 0;
-  @StorageLink('isRunning') @Watch('onRunningChange') isRunning: boolean = false;
-  @StorageLink('vpnStartTime') vpnStartTime: number = 0;
-  @State durationStr: string = '00:00:00';
+@ComponentV2
+struct TimerDisplay {
+  @Param isRunning: boolean = false;
+  @Param vpnStartTime: number = 0;
+  @Local durationStr: string = '00:00:00';
   private timerId: number = -1;
-  @StorageLink('selectedDnsIds') @Watch('updateCurrentDnsName') selectedDnsIds: string[] = [];
-  @StorageLink('dnsList') @Watch('updateCurrentDnsName') dnsList: DnsInfo[] = [];
-  @State currentDnsName: string = '请选择 DNS';
-  @State buttonScale: number = 1;
-  @State dnsCount: number = 0;
-  private subscriber: commonEventManager.CommonEventSubscriber | null = null;
-  @Link currentIndex: number;
+
+  @Monitor('isRunning')
+  onRunningChange() {
+    if (this.isRunning) {
+      this.startTimer();
+    } else {
+      this.stopTimer();
+    }
+  }
 
   aboutToAppear() {
-    // DnsDataManager 已经在 EntryAbility 中初始化，这里无需重复初始化
-    this.updateCurrentDnsName();
-    this.subscribeToDnsStats();
     if (this.isRunning) {
       this.startTimer();
     }
   }
 
   aboutToDisappear() {
-    if (this.subscriber) {
-      commonEventManager.unsubscribe(this.subscriber);
-    }
     this.stopTimer();
-  }
-
-  onRunningChange() {
-    if (this.isRunning) {
-      if (this.vpnStartTime <= 0) {
-        this.vpnStartTime = Date.now();
-      }
-      this.startTimer();
-    } else {
-      this.stopTimer();
-      this.vpnStartTime = 0;
-    }
   }
 
   startTimer() {
@@ -131,6 +114,11 @@ export default struct StartTab {
     if (this.timerId !== -1) {
       clearInterval(this.timerId);
       this.timerId = -1;
+    }
+    // Reset duration string if needed, or keep last value?
+    // User logic reset it on stop
+    if (!this.isRunning) {
+       this.durationStr = '00:00:00'; // Logic from original
     }
   }
 
@@ -149,6 +137,43 @@ export default struct StartTab {
     const s = diff % 60;
     this.durationStr =
       `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
+
+  build() {
+    Text(this.isRunning ? `已运行 ${this.durationStr}` : '未连接')
+      .fontSize($r('app.float.text_size_small'))
+      .fontColor($r('app.color.text_secondary'))
+      .margin({ top: $r('app.float.space_sm') })
+  }
+}
+
+@ComponentV2
+export default struct StartTab {
+  @Local topSafeHeight: number = AppStorageV2.connect(Number, 'topSafeHeight', () => 0)!;
+  @Local bottomSafeHeight: number = AppStorageV2.connect(Number, 'bottomSafeHeight', () => 0)!;
+  @Local appState: AppState = AppStorageV2.connect(AppState, 'appState', () => new AppState())!;
+  
+  @Local selectedDnsIds: string[] = AppStorageV2.connect(Array, 'selectedDnsIds', () => [])!;
+  @Local dnsList: DnsInfo[] = AppStorageV2.connect(Array, 'dnsList', () => [])!;
+  @Local currentBackupDnsId: string = AppStorageV2.connect(String, 'currentBackupDnsId', () => '')!;
+
+  @Local buttonScale: number = 1;
+  @Local dnsCount: number = 0;
+  private subscriber: commonEventManager.CommonEventSubscriber | null = null;
+  
+  @Param currentIndex: number = 0;
+  @Event onIndexChange: (index: number) => void = () => {};
+
+  aboutToAppear() {
+    // DnsDataManager 已经在 EntryAbility 中初始化，这里无需重复初始化
+    this.subscribeToDnsStats();
+    // No need to manually start timer here, TimerDisplay handles it
+  }
+
+  aboutToDisappear() {
+    if (this.subscriber) {
+      commonEventManager.unsubscribe(this.subscriber);
+    }
   }
 
   subscribeToDnsStats() {
@@ -174,19 +199,19 @@ export default struct StartTab {
     });
   }
 
-  updateCurrentDnsName() {
+  getDnsName(): string {
     if (this.selectedDnsIds.length === 0) {
-      this.currentDnsName = '请选择 DNS';
+      return '请选择 DNS';
     } else if (this.selectedDnsIds.length === 1) {
       const dns = this.dnsList.find(i => i.id === this.selectedDnsIds[0]);
-      this.currentDnsName = dns ? dns.name : '未知 DNS';
+      return dns ? dns.name : '未知 DNS';
     } else {
-      this.currentDnsName = `已启用 ${this.selectedDnsIds.length} 个服务`;
+      return `已启用 ${this.selectedDnsIds.length} 个服务`;
     }
   }
 
   async toggleRunning() {
-    if (this.selectedDnsIds.length === 0 && !this.isRunning) {
+    if (this.selectedDnsIds.length === 0 && !this.appState.isRunning) {
       // 如果没有选中且尝试启动，先尝试默认选中第一个
       if (this.dnsList.length > 0) {
         await DnsDataManager.getInstance().toggleDnsId(this.dnsList[0].id);
@@ -207,7 +232,7 @@ export default struct StartTab {
       });
     }, 150);
 
-    if (this.isRunning) {
+    if (this.appState.isRunning) {
       await this.stopVpn();
     } else {
       await this.startVpn();
@@ -226,7 +251,7 @@ export default struct StartTab {
 
     // 获取备用 DNS 列表 (仅 UDP)
     const backupList = DnsDataManager.getInstance().getBackupDnsList();
-    const currentBackupId = AppStorage.get<string>('currentBackupDnsId');
+    const currentBackupId = this.currentBackupDnsId;
     let backupIps: string[] = [];
 
     if (currentBackupId) {
@@ -260,7 +285,10 @@ export default struct StartTab {
       // Note: startVpnExtensionAbility is async but returns promise.
       // Real connection state depends on VpnExtensionAbility lifecycle.
       // Here we optimistically set isRunning.
-      AppStorage.setOrCreate('isRunning', true);
+      this.appState.isRunning = true;
+      if (this.appState.vpnStartTime <= 0) {
+         this.appState.vpnStartTime = Date.now();
+      }
     } catch (e) {
       console.error('Start VPN failed: ' + JSON.stringify(e));
     }
@@ -274,7 +302,8 @@ export default struct StartTab {
     };
     try {
       await vpnExtension.stopVpnExtensionAbility(want);
-      AppStorage.setOrCreate('isRunning', false);
+      this.appState.isRunning = false;
+      this.appState.vpnStartTime = 0;
     } catch (e) {
       console.error('Stop VPN failed: ' + JSON.stringify(e));
     }
@@ -285,7 +314,7 @@ export default struct StartTab {
       // 中间大按钮区域
       Column() {
         Stack({ alignContent: Alignment.Center }) {
-          if (this.isRunning) {
+          if (this.appState.isRunning) {
             WaveView()
               .transition(TransitionEffect.OPACITY.animation({ duration: 300 }))
           }
@@ -299,10 +328,10 @@ export default struct StartTab {
           .width($r('app.float.start_button_size'))
           .height($r('app.float.start_button_size'))
           .borderRadius($r('app.float.start_button_radius'))
-          .backgroundColor(this.isRunning ? $r('app.color.brand_color') : $r('app.color.button_inactive_bg'))
+          .backgroundColor(this.appState.isRunning ? $r('app.color.brand_color') : $r('app.color.button_inactive_bg'))
           .shadow({
             radius: 20,
-            color: this.isRunning ? $r('app.color.brand_shadow_active') : $r('app.color.card_shadow'),
+            color: this.appState.isRunning ? $r('app.color.brand_shadow_active') : $r('app.color.card_shadow'),
             offsetY: 10
           })
           .scale({ x: this.buttonScale, y: this.buttonScale })
@@ -314,34 +343,34 @@ export default struct StartTab {
         .height(260)
         .alignContent(Alignment.Center)
 
-        Text(this.isRunning ? '已保护' : '点击启动')
+        Text(this.appState.isRunning ? '已保护' : '点击启动')
           .fontSize($r('app.float.text_size_sub_title'))
           .fontColor($r('app.color.text_primary'))
           .fontWeight(FontWeight.Medium)
           .margin({ top: $r('app.float.space_sm') })
 
-        Text(this.isRunning ? `已运行 ${this.durationStr}` : '未连接')
-          .fontSize($r('app.float.text_size_small'))
-          .fontColor($r('app.color.text_secondary'))
-          .margin({ top: $r('app.float.space_sm') })
+        TimerDisplay({
+            isRunning: this.appState.isRunning,
+            vpnStartTime: this.appState.vpnStartTime
+        })
       }
       .flexGrow(1)
       .justifyContent(FlexAlign.Center)
 
       Column() {
         List() {
-          ListItem() {
+          HdsListItemCard() {
             Column() {
               SettingsItem({
                 title: 'DNS 服务',
-                value: this.currentDnsName,
+                value: this.getDnsName(),
                 showArrow: true,
                 onClickHandler: () => {
-                  this.currentIndex = 1;
+                  this.onIndexChange(1);
                 }
               })
 
-              if (this.isRunning) {
+              if (this.appState.isRunning) {
                 Divider().color($r('app.color.divider_color')).strokeWidth(0.5).margin({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
 
                 SettingsItem({
@@ -351,9 +380,6 @@ export default struct StartTab {
                 })
               }
             }
-            .backgroundColor($r('app.color.card_background'))
-            .borderRadius(12)
-            .clip(true)
           }
         }
         .width('100%')

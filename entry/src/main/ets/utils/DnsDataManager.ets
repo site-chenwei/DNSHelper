@@ -1,7 +1,7 @@
-import { DnsInfo, DEFAULT_DNS_LIST, DEFAULT_BACKUP_DNS_LIST } from '../model/DnsInfo';
+import { DnsInfo, AppState, DEFAULT_DNS_LIST, DEFAULT_BACKUP_DNS_LIST } from '../model/DnsInfo';
 import common from '@ohos.app.ability.common';
 import dataPreferences from '@ohos.data.preferences';
-import { promptAction } from '@kit.ArkUI';
+import { promptAction, AppStorageV2 } from '@kit.ArkUI';
 
 export class DnsDataManager {
   private static instance: DnsDataManager;
@@ -15,14 +15,17 @@ export class DnsDataManager {
   }
 
   async init(context: common.Context) {
+    // 初始化 AppState
+    AppStorageV2.connect(AppState, 'appState', () => new AppState());
+
     // 初始化 Preferences
     try {
       this.preferences = await dataPreferences.getPreferences(context, 'dns_helper_prefs');
     } catch (e) {
       console.error('Failed to get preferences', JSON.stringify(e));
       // 如果初始化失败，使用默认值回退
-      AppStorage.setOrCreate('dnsList', DEFAULT_DNS_LIST);
-      AppStorage.setOrCreate('currentDnsId', '');
+      AppStorageV2.connect(Array, 'dnsList', () => DEFAULT_DNS_LIST);
+      AppStorageV2.connect(String, 'currentDnsId', () => '');
       return;
     }
 
@@ -31,7 +34,9 @@ export class DnsDataManager {
     try {
       const jsonStr = await this.preferences.get('saved_dns_list', '') as string;
       if (jsonStr) {
-        dnsList = JSON.parse(jsonStr) as DnsInfo[];
+        // Need to reconstruct objects for @ObservedV2 to work if they were plain objects
+        const rawList = JSON.parse(jsonStr) as DnsInfo[];
+        dnsList = rawList.map(d => new DnsInfo(d.name, d.primaryDns, d.isDefault, d.type, d.preferHttp3));
       }
     } catch (e) {
       console.error('Failed to parse dns list', JSON.stringify(e));
@@ -39,11 +44,11 @@ export class DnsDataManager {
 
     // 如果为空或加载失败，使用默认值
     if (dnsList.length === 0) {
-      dnsList = [...DEFAULT_DNS_LIST]; // 克隆默认列表
+      dnsList = DEFAULT_DNS_LIST.map(d => new DnsInfo(d.name, d.primaryDns, d.isDefault, d.type, d.preferHttp3)); // Clone default list
       this.saveDnsListToPrefs(dnsList);
     }
 
-    AppStorage.setOrCreate('dnsList', dnsList);
+    AppStorageV2.connect(Array, 'dnsList', () => dnsList);
 
     // 加载当前选中的 DNS IDs
     let selectedIds: string[] = [];
@@ -71,16 +76,17 @@ export class DnsDataManager {
       this.saveSelectedDnsIdsToPrefs(selectedIds);
     }
     
-    AppStorage.setOrCreate('selectedDnsIds', selectedIds);
+    AppStorageV2.connect(Array, 'selectedDnsIds', () => selectedIds);
     // 为了兼容旧代码（如果有遗漏），保留 currentDnsId 为第一个选中的 ID
-    AppStorage.setOrCreate('currentDnsId', selectedIds.length > 0 ? selectedIds[0] : '');
+    AppStorageV2.connect(String, 'currentDnsId', () => selectedIds.length > 0 ? selectedIds[0] : '');
 
     // 加载备用 DNS 列表
     let backupDnsList: DnsInfo[] = [];
     try {
       const jsonStr = await this.preferences.get('saved_backup_dns_list', '') as string;
       if (jsonStr) {
-        backupDnsList = JSON.parse(jsonStr) as DnsInfo[];
+        const rawList = JSON.parse(jsonStr) as DnsInfo[];
+        backupDnsList = rawList.map(d => new DnsInfo(d.name, d.primaryDns, d.isDefault, d.type, d.preferHttp3));
       }
     } catch (e) {
       console.error('Failed to parse backup dns list', JSON.stringify(e));
@@ -90,197 +96,168 @@ export class DnsDataManager {
     const defaultBackup = DEFAULT_BACKUP_DNS_LIST[0];
     const existsIndex = backupDnsList.findIndex(d => (d.id === defaultBackup.id || d.primaryDns === defaultBackup.primaryDns));
     if (existsIndex === -1) {
-      backupDnsList.unshift(defaultBackup);
+      backupDnsList.unshift(new DnsInfo(defaultBackup.name, defaultBackup.primaryDns, defaultBackup.isDefault, defaultBackup.type, defaultBackup.preferHttp3));
       this.saveBackupDnsListToPrefs(backupDnsList);
     }
     
-    AppStorage.setOrCreate('backupDnsList', backupDnsList);
+    AppStorageV2.connect(Array, 'backupDnsList', () => backupDnsList);
 
     // 加载当前选中的备用 DNS ID
     let currentBackupId = '';
     try {
-      currentBackupId = await this.preferences.get('saved_backup_dns_id', '') as string;
+      currentBackupId = await this.preferences.get('saved_current_backup_dns_id', '') as string;
     } catch (e) {
       console.error('Failed to load current backup id', JSON.stringify(e));
     }
-
-    // 验证 ID 有效性
-    const isBackupValid = currentBackupId && backupDnsList.some(d => d.id === currentBackupId);
-    if (!isBackupValid && backupDnsList.length > 0) {
+    
+    // 如果没有选中的，默认选中第一个
+    if (!currentBackupId && backupDnsList.length > 0) {
       currentBackupId = backupDnsList[0].id;
-      this.saveCurrentBackupIdToPrefs(currentBackupId);
+      this.saveCurrentBackupDnsIdToPrefs(currentBackupId);
     }
-    AppStorage.setOrCreate('currentBackupDnsId', currentBackupId);
+    
+    AppStorageV2.connect(String, 'currentBackupDnsId', () => currentBackupId);
   }
 
-  private async saveDnsListToPrefs(list: DnsInfo[]) {
-    if (!this.preferences) return;
-    try {
-      await this.preferences.put('saved_dns_list', JSON.stringify(list));
-      await this.preferences.flush();
-    } catch (e) {
-      console.error('Failed to save dns list', JSON.stringify(e));
-    }
-  }
-
-  private async saveSelectedDnsIdsToPrefs(ids: string[]) {
-    if (!this.preferences) return;
-    try {
-      await this.preferences.put('saved_selected_dns_ids', JSON.stringify(ids));
-      await this.preferences.flush();
-    } catch (e) {
-      console.error('Failed to save selected ids', JSON.stringify(e));
-    }
-  }
-
-  // private async saveCurrentIdToPrefs(id: string) { ... } // Deprecated
-
-  private async saveBackupDnsListToPrefs(list: DnsInfo[]) {
-    if (!this.preferences) return;
-    try {
-      await this.preferences.put('saved_backup_dns_list', JSON.stringify(list));
-      await this.preferences.flush();
-    } catch (e) {
-      console.error('Failed to save backup dns list', JSON.stringify(e));
-    }
-  }
-
+  // 获取 DNS 列表
   getDnsList(): DnsInfo[] {
-    return AppStorage.get<DnsInfo[]>('dnsList') || DEFAULT_DNS_LIST;
+    return AppStorageV2.connect(Array, 'dnsList', () => [])!;
+  }
+  
+  // 获取备用 DNS 列表
+  getBackupDnsList(): DnsInfo[] {
+    return AppStorageV2.connect(Array, 'backupDnsList', () => [])!;
   }
 
+  // 保存 DNS 列表到 Preferences
+  private async saveDnsListToPrefs(dnsList: DnsInfo[]) {
+    if (this.preferences) {
+      try {
+        await this.preferences.put('saved_dns_list', JSON.stringify(dnsList));
+        await this.preferences.flush();
+      } catch (e) {
+        console.error('Failed to save dns list', JSON.stringify(e));
+      }
+    }
+  }
+
+  // 添加 DNS
   async addDns(dns: DnsInfo) {
     const list = this.getDnsList();
     list.push(dns);
-    AppStorage.setOrCreate('dnsList', list);
+    AppStorageV2.connect(Array, 'dnsList', () => list);
     await this.saveDnsListToPrefs(list);
   }
 
-  async updateDns(dns: DnsInfo, originalId?: string) {
-    let list = this.getDnsList();
-    const targetId = originalId || dns.id;
-    const index = list.findIndex(item => item.id === targetId);
+  // 更新 DNS
+  async updateDns(dns: DnsInfo, oldId: string) {
+    const list = this.getDnsList();
+    const index = list.findIndex(d => d.id === oldId);
     if (index !== -1) {
       list[index] = dns;
-      AppStorage.setOrCreate('dnsList', list);
+      AppStorageV2.connect(Array, 'dnsList', () => list);
       await this.saveDnsListToPrefs(list);
-
-      // 如果修改了 IP (ID 变化)，且当前选中项包含旧 ID，需要更新选中项
-      if (targetId !== dns.id) {
-        const selectedIds = AppStorage.get<string[]>('selectedDnsIds') || [];
-        if (selectedIds.includes(targetId)) {
-          const newSelectedIds = selectedIds.map(id => id === targetId ? dns.id : id);
-          await this.setSelectedDnsIds(newSelectedIds);
-        }
-      }
-    }
-  }
-
-  async removeDns(id: string) {
-    let list = this.getDnsList();
-    list = list.filter(item => item.id !== id);
-    AppStorage.setOrCreate('dnsList', list);
-    await this.saveDnsListToPrefs(list);
-
-    // 如果删除了选中的 DNS，从选中列表中移除
-    const selectedIds = AppStorage.get<string[]>('selectedDnsIds') || [];
-    if (selectedIds.includes(id)) {
-      const newSelectedIds = selectedIds.filter(sid => sid !== id);
-      // 如果全部删完了，且还有列表项，默认选中第一个
-      if (newSelectedIds.length === 0 && list.length > 0) {
-        newSelectedIds.push(list[0].id);
-      }
-      await this.setSelectedDnsIds(newSelectedIds);
     }
   }
   
-  async setSelectedDnsIds(ids: string[]) {
-      AppStorage.setOrCreate('selectedDnsIds', ids);
-      // Update compatibility field
-      AppStorage.setOrCreate('currentDnsId', ids.length > 0 ? ids[0] : '');
-      await this.saveSelectedDnsIdsToPrefs(ids);
-  }
-
-  async toggleDnsId(id: string) {
-      const selectedIds = AppStorage.get<string[]>('selectedDnsIds') || [];
-      let newSelectedIds: string[];
-      if (selectedIds.includes(id)) {
-          // If it's the only one, don't allow deselecting
-          if (selectedIds.length === 1) {
-              promptAction.showToast({ message: '至少需要启用一个DNS服务' });
-              return; 
-          }
-          newSelectedIds = selectedIds.filter(sid => sid !== id);
-      } else {
-          newSelectedIds = [...selectedIds, id];
-      }
-      await this.setSelectedDnsIds(newSelectedIds);
-  }
-
-  // Deprecated wrapper
-  async setCurrentDnsId(id: string) {
-      await this.setSelectedDnsIds([id]);
-  }
-
-  private async saveCurrentBackupIdToPrefs(id: string) {
-    if (!this.preferences) return;
-    try {
-      await this.preferences.put('saved_backup_dns_id', id);
-      await this.preferences.flush();
-    } catch (e) {
-      console.error('Failed to save current backup id', JSON.stringify(e));
+  // 删除 DNS
+  async deleteDns(id: string) {
+    let list = this.getDnsList();
+    list = list.filter(d => d.id !== id);
+    AppStorageV2.connect(Array, 'dnsList', () => list);
+    await this.saveDnsListToPrefs(list);
+    
+    // 如果删除的是当前选中的，取消选中
+    let selectedIds = AppStorageV2.connect(Array, 'selectedDnsIds', () => []) as string[];
+    if (selectedIds.includes(id)) {
+        selectedIds = selectedIds.filter(selectedId => selectedId !== id);
+        AppStorageV2.connect(Array, 'selectedDnsIds', () => selectedIds);
+        this.saveSelectedDnsIdsToPrefs(selectedIds);
     }
   }
 
-  async setCurrentBackupDnsId(id: string) {
-    AppStorage.setOrCreate('currentBackupDnsId', id);
-    await this.saveCurrentBackupIdToPrefs(id);
+  // 保存选中的 DNS IDs 到 Preferences
+  private async saveSelectedDnsIdsToPrefs(ids: string[]) {
+    if (this.preferences) {
+      try {
+        await this.preferences.put('saved_selected_dns_ids', JSON.stringify(ids));
+        await this.preferences.flush();
+      } catch (e) {
+        console.error('Failed to save selected ids', JSON.stringify(e));
+      }
+    }
   }
 
-  getBackupDnsList(): DnsInfo[] {
-    return AppStorage.get<DnsInfo[]>('backupDnsList') || [];
+  // 设置当前选中的 DNS IDs
+  async setSelectedDnsIds(ids: string[]) {
+    AppStorageV2.connect(Array, 'selectedDnsIds', () => ids);
+    await this.saveSelectedDnsIdsToPrefs(ids);
+    
+    // 为了兼容旧代码，更新 currentDnsId
+    const currentId = ids.length > 0 ? ids[0] : '';
+    AppStorageV2.connect(String, 'currentDnsId', () => currentId);
   }
-
+  
+  // 保存备用 DNS 列表到 Preferences
+  private async saveBackupDnsListToPrefs(dnsList: DnsInfo[]) {
+    if (this.preferences) {
+      try {
+        await this.preferences.put('saved_backup_dns_list', JSON.stringify(dnsList));
+        await this.preferences.flush();
+      } catch (e) {
+        console.error('Failed to save backup dns list', JSON.stringify(e));
+      }
+    }
+  }
+  
+  // 添加备用 DNS
   async addBackupDns(dns: DnsInfo) {
     const list = this.getBackupDnsList();
     list.push(dns);
-    AppStorage.setOrCreate('backupDnsList', list);
+    AppStorageV2.connect(Array, 'backupDnsList', () => list);
     await this.saveBackupDnsListToPrefs(list);
   }
-
-  async updateBackupDns(dns: DnsInfo, originalId?: string) {
-    let list = this.getBackupDnsList();
-    const targetId = originalId || dns.id;
-    const index = list.findIndex(item => item.id === targetId);
+  
+  // 更新备用 DNS
+  async updateBackupDns(dns: DnsInfo, oldId: string) {
+    const list = this.getBackupDnsList();
+    const index = list.findIndex(d => d.id === oldId);
     if (index !== -1) {
       list[index] = dns;
-      AppStorage.setOrCreate('backupDnsList', list);
+      AppStorageV2.connect(Array, 'backupDnsList', () => list);
       await this.saveBackupDnsListToPrefs(list);
-
-      // 如果修改了 IP (ID 变化)，且当前选中项是旧 ID，需要更新选中项
-      if (targetId !== dns.id) {
-        const currentBackupId = AppStorage.get<string>('currentBackupDnsId');
-        if (currentBackupId === targetId) {
-          await this.setCurrentBackupDnsId(dns.id);
-        }
+    }
+  }
+  
+  // 删除备用 DNS
+  async deleteBackupDns(id: string) {
+    let list = this.getBackupDnsList();
+    list = list.filter(d => d.id !== id);
+    AppStorageV2.connect(Array, 'backupDnsList', () => list);
+    await this.saveBackupDnsListToPrefs(list);
+    
+    // 如果删除的是当前选中的，重置为第一个
+    const currentId = AppStorageV2.connect(String, 'currentBackupDnsId', () => '')!;
+    if (currentId === id && list.length > 0) {
+      this.setCurrentBackupDnsId(list[0].id);
+    }
+  }
+  
+  // 保存当前选中的备用 DNS ID 到 Preferences
+  private async saveCurrentBackupDnsIdToPrefs(id: string) {
+    if (this.preferences) {
+      try {
+        await this.preferences.put('saved_current_backup_dns_id', id);
+        await this.preferences.flush();
+      } catch (e) {
+        console.error('Failed to save current backup id', JSON.stringify(e));
       }
     }
   }
-
-  async removeBackupDns(id: string) {
-    let list = this.getBackupDnsList();
-    list = list.filter(item => item.id !== id);
-    AppStorage.setOrCreate('backupDnsList', list);
-    await this.saveBackupDnsListToPrefs(list);
-
-    // 如果删除了当前选中的备用 DNS，尝试切换到第一个
-    const currentBackupId = AppStorage.get<string>('currentBackupDnsId');
-    if (currentBackupId === id) {
-      if (list.length > 0) {
-        await this.setCurrentBackupDnsId(list[0].id);
-      } else {
-        await this.setCurrentBackupDnsId('');
-      }
-    }
+  
+  // 设置当前选中的备用 DNS ID
+  async setCurrentBackupDnsId(id: string) {
+    AppStorageV2.connect(String, 'currentBackupDnsId', () => id);
+    await this.saveCurrentBackupDnsIdToPrefs(id);
   }
 }

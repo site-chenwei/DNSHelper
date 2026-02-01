@@ -1,20 +1,13 @@
-import { CommonNavigationTitle } from '../component/CommonComponents';
+import { HdsNavDestination } from '../component/HdsComponents';
+import { AppStorageV2 } from '@kit.ArkUI';
 
-@Entry
-@Component
-struct VersionInfoPage {
-  @State appName: string = 'DNS助手';
-  @State versionName: string = '1.0.0';
-  @StorageProp('topSafeHeight') topSafeHeight: number = 0;
-  @StorageProp('bottomSafeHeight') bottomSafeHeight: number = 0;
-
-  @Builder
-  NavigationTitle() {
-    CommonNavigationTitle({ title: '关于' })
-  }
+@ComponentV2
+export default struct VersionInfoPage {
+  @Local appName: string = 'DNS助手';
+  @Local versionName: string = '1.0.0';
 
   build() {
-    Navigation() {
+    HdsNavDestination({ title: '关于' }) {
       Column() {
         Blank().height(60)
 
@@ -39,11 +32,6 @@ struct VersionInfoPage {
       .width('100%')
       .height('100%')
       .alignItems(HorizontalAlign.Center)
-      .backgroundColor($r('app.color.start_window_background'))
     }
-    .title(this.NavigationTitle())
-    .titleMode(NavigationTitleMode.Mini)
-    .backgroundColor($r('app.color.tab_bar_background'))
-    .padding({ top: this.topSafeHeight })
   }
 }

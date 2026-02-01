@@ -1,15 +1,21 @@
 import StartTab from './StartTab';
 import ConfigTab from './ConfigTab';
 import SettingsTab from './SettingsTab';
-import { window } from '@kit.ArkUI';
+import DnsEditPage from './DnsEditPage';
+import BackupDnsPage from './BackupDnsPage';
+import VersionInfoPage from './VersionInfoPage';
+import { HdsNavigation, HdsTabs } from '../component/HdsComponents';
+import { window, AppStorageV2 } from '@kit.ArkUI';
 
 @Entry
-@Component
+@ComponentV2
 struct Index {
-  @State @Watch('onIndexChange') currentIndex: number = 0;
-  @State bottomSafeHeight: number = 0;
+  @Local currentIndex: number = 0;
+  @Local navPathStack: NavPathStack = AppStorageV2.connect(NavPathStack, 'navPathStack', () => new NavPathStack())!;
+  @Local bottomSafeHeight: number = 0;
   private controller: TabsController = new TabsController();
 
+  @Monitor('currentIndex')
   onIndexChange() {
     this.controller.changeIndex(this.currentIndex);
   }
@@ -18,20 +24,31 @@ struct Index {
     window.getLastWindow(getContext(this)).then(currentWindow => {
       let bottom = currentWindow.getWindowAvoidArea(window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR).bottomRect;
       this.bottomSafeHeight = px2vp(bottom.height);
-      AppStorage.setOrCreate('bottomSafeHeight', px2vp(bottom.height));
+      AppStorageV2.connect(Number, 'bottomSafeHeight', () => px2vp(bottom.height));
 
       let top = currentWindow.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM).topRect;
-      AppStorage.setOrCreate('topSafeHeight', px2vp(top.height));
+      AppStorageV2.connect(Number, 'topSafeHeight', () => px2vp(top.height));
 
       currentWindow.on('avoidAreaChange', async (data) => {
         if (data.type === window.AvoidAreaType.TYPE_NAVIGATION_INDICATOR) {
           this.bottomSafeHeight = px2vp(data.area.bottomRect.height);
-          AppStorage.setOrCreate('bottomSafeHeight', px2vp(data.area.bottomRect.height));
+          AppStorageV2.connect(Number, 'bottomSafeHeight', () => px2vp(data.area.bottomRect.height));
         } else if (data.type === window.AvoidAreaType.TYPE_SYSTEM) {
-          AppStorage.setOrCreate('topSafeHeight', px2vp(data.area.topRect.height));
+          AppStorageV2.connect(Number, 'topSafeHeight', () => px2vp(data.area.topRect.height));
         }
       })
     })
+  }
+
+  @Builder
+  PageMap(name: string, param: Object) {
+    if (name === 'DnsEditPage') {
+      DnsEditPage({ params: param as Record<string, Object> })
+    } else if (name === 'BackupDnsPage') {
+      BackupDnsPage()
+    } else if (name === 'VersionInfoPage') {
+      VersionInfoPage()
+    }
   }
 
   @Builder
@@ -66,10 +83,24 @@ struct Index {
   }
 
   build() {
-    Column() {
-      Tabs({ barPosition: BarPosition.End, controller: this.controller }) {
+    HdsNavigation({
+      pathStack: this.navPathStack,
+      navDestination: this.PageMap
+    }) {
+      HdsTabs({
+        controller: this.controller,
+        onChange: (index: number) => {
+          this.currentIndex = index;
+        }
+      }) {
         TabContent() {
-          StartTab({ currentIndex: this.currentIndex })
+          StartTab({
+            currentIndex: this.currentIndex,
+            onIndexChange: (index: number) => {
+              this.currentIndex = index;
+              this.controller.changeIndex(index);
+            }
+          })
         }
         .tabBar(this.TabBuilder('启动', 0, $r('app.media.ic_home_filled'), $r('app.media.ic_home')))
 
@@ -83,16 +114,6 @@ struct Index {
         }
         .tabBar(this.TabBuilder('设置', 2, $r('app.media.ic_settings_filled'), $r('app.media.ic_settings')))
       }
-      .scrollable(false)
-      .barMode(BarMode.Fixed)
-      .barHeight(56 + this.bottomSafeHeight)
-      .onChange((index: number) => {
-        this.currentIndex = index;
-      })
-      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     }
-    .width('100%')
-    .height('100%')
-    .backgroundColor($r('app.color.page_background'))
   }
 }

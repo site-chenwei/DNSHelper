@@ -1,12 +1,12 @@
 import { DnsType } from '../model/DnsInfo';
 import { UiUtils } from '../utils/UiUtils';
 
-@Component
+@ComponentV2
 export struct SettingsItem {
-  @Prop title: string = '';
-  @Prop value: string = '';
-  @Prop showArrow: boolean = true;
-  @Prop icon: ResourceStr | undefined = undefined;
+  @Param title: string = '';
+  @Param value: string = '';
+  @Param showArrow: boolean = true;
+  @Param icon: ResourceStr | undefined = undefined;
   onClickHandler?: () => void;
 
   build() {
@@ -43,16 +43,13 @@ export struct SettingsItem {
     }
     .width('100%')
     .height($r('app.float.list_item_height'))
-    .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
-    .backgroundColor($r('app.color.card_background'))
-    .borderRadius(12)
     .onClick(() => {
       if (this.onClickHandler) this.onClickHandler();
     })
   }
 }
 
-@Component
+@ComponentV2
 export struct CommonDeleteButton {
   onClickHandler?: () => void;
 
@@ -72,9 +69,9 @@ export struct CommonDeleteButton {
   }
 }
 
-@Component
+@ComponentV2
 export struct CommonNavigationTitle {
-  @Prop title: string = '';
+  @Param title: string = '';
 
   build() {
     Row() {
@@ -89,10 +86,10 @@ export struct CommonNavigationTitle {
   }
 }
 
-@Component
+@ComponentV2
 export struct DnsTag {
-  @Prop type: string = DnsType.UDP;
-  @Prop isDefault: boolean = false;
+  @Param type: string = DnsType.UDP;
+  @Param isDefault: boolean = false;
 
   build() {
     Row() {
@@ -141,11 +138,12 @@ export struct DnsTag {
   }
 }
 
-@Component
+@ComponentV2
 export struct InputCell {
-  @Prop title: string = '';
-  @Prop placeholder: string = '';
-  @Link value: string;
+  @Param title: string = '';
+  @Param placeholder: string = '';
+  @Param value: string = '';
+  @Event onChange: (value: string) => void = () => {};
 
   build() {
     Row() {
@@ -163,20 +161,19 @@ export struct InputCell {
         .height('100%')
         .layoutWeight(1)
         .onChange((val) => {
-          this.value = val;
+          this.onChange(val);
         })
     }
     .width('100%')
     .height($r('app.float.list_item_height'))
-    .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
-    .backgroundColor($r('app.color.card_background'))
   }
 }
 
-@Component
+@ComponentV2
 export struct SwitchCell {
-  @Prop title: string = '';
-  @Link isOn: boolean;
+  @Param title: string = '';
+  @Param isOn: boolean = false;
+  @Event onChange: (isOn: boolean) => void = () => {};
 
   build() {
     Row() {
@@ -190,13 +187,11 @@ export struct SwitchCell {
         .selectedColor($r('app.color.brand_color'))
         .switchPointColor($r('app.color.text_white'))
         .onChange((isOn) => {
-          this.isOn = isOn;
+          this.onChange(isOn);
         })
     }
     .width('100%')
     .height($r('app.float.list_item_height'))
-    .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
-    .backgroundColor($r('app.color.card_background'))
   }
 }
 
@@ -205,12 +200,12 @@ interface DropdownOption {
   icon?: ResourceStr;
 }
 
-@Component
+@ComponentV2
 export struct SelectCell {
-  @Prop title: string = '';
-  @Prop value: string = '';
-  @Prop options: string[] = [];
-  onSelect?: (val: string) => void;
+  @Param title: string = '';
+  @Param value: string = '';
+  @Param options: string[] = [];
+  @Event onSelect: (val: string) => void = () => {};
 
   build() {
     Row() {
@@ -232,14 +227,12 @@ export struct SelectCell {
         .menuBackgroundColor($r('app.color.card_background'))
         .backgroundColor(Color.Transparent)
         .onSelect((index: number, val: string) => {
-          if (this.onSelect) this.onSelect(val);
+          this.onSelect(val);
         })
         .height('100%')
         .layoutWeight(1)
     }
     .width('100%')
     .height($r('app.float.list_item_height'))
-    .padding({ left: $r('app.float.space_lg'), right: 0 })
-    .backgroundColor($r('app.color.card_background'))
   }
 }

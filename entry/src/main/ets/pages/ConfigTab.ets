@@ -1,165 +1,139 @@
 import { DnsInfo, DnsType } from '../model/DnsInfo';
 import { DnsDataManager } from '../utils/DnsDataManager';
-import { promptAction, router } from '@kit.ArkUI';
-import { DnsTag, CommonNavigationTitle } from '../component/CommonComponents';
+import { promptAction, AppStorageV2 } from '@kit.ArkUI';
+import { DnsTag } from '../component/CommonComponents';
+import { HdsListItemCard } from '../component/HdsComponents';
 
-@Component
+@ComponentV2
 export default struct ConfigTab {
-  @StorageLink('dnsList') dnsList: DnsInfo[] = [];
-  @StorageLink('selectedDnsIds') selectedDnsIds: string[] = [];
-  @StorageProp('topSafeHeight') topSafeHeight: number = 0;
-  @StorageProp('bottomSafeHeight') bottomSafeHeight: number = 0;
+  @Local dnsList: DnsInfo[] = AppStorageV2.connect(Array, 'dnsList', () => [])!;
+  @Local selectedDnsIds: string[] = AppStorageV2.connect(Array, 'selectedDnsIds', () => [])!;
+  @Local topSafeHeight: number = AppStorageV2.connect(Number, 'topSafeHeight', () => 0)!;
+  @Local bottomSafeHeight: number = AppStorageV2.connect(Number, 'bottomSafeHeight', () => 0)!;
+  @Local navPathStack: NavPathStack = AppStorageV2.connect(NavPathStack, 'navPathStack', () => new NavPathStack())!;
 
   async aboutToAppear() {
     await DnsDataManager.getInstance().init(getContext(this));
   }
 
-  @Builder
-  NavigationTitle() {
-    CommonNavigationTitle({ title: 'DNS列表' })
-  }
+  build() {
+    Column() {
+      // 标题栏
+      Row() {
+        Text('DNS 配置')
+          .fontSize($r('app.float.text_size_title'))
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.text_primary'))
+        
+        Blank()
 
-  @Builder
-  NavigationMenus() {
-    Row() {
-      Button() {
-        Image($r('app.media.ic_add'))
+        Image($r('app.media.ic_public_add'))
           .width(24)
           .height(24)
           .fillColor($r('app.color.brand_color'))
+          .onClick(() => {
+            this.navPathStack.pushPath({ name: 'DnsEditPage', param: { isBackup: false } });
+          })
       }
-      .onClick(() => {
-        router.pushUrl({ url: 'pages/DnsEditPage' });
-      })
-      .backgroundColor(Color.Transparent)
-      .padding({ right: $r('app.float.space_lg') })
-    }
-    .height('100%')
-    .justifyContent(FlexAlign.End)
-    .alignItems(VerticalAlign.Center)
-  }
+      .width('100%')
+      .height(56)
+      .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
+      .margin({ top: this.topSafeHeight })
 
-  build() {
-    Navigation() {
-      Column() {
-        Row() {
-          Image($r('app.media.ic_dns_filled'))
-            .width(16)
-            .height(16)
-            .fillColor($r('app.color.text_secondary'))
-            .margin({ right: $r('app.float.space_sm') })
-          Text('支持多选，将并发请求所有选中的DNS服务')
-            .fontSize($r('app.float.text_size_small'))
-            .fontColor($r('app.color.text_secondary'))
-        }
-        .width('100%')
-        .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg'), top: $r('app.float.space_lg')})
-        .alignItems(VerticalAlign.Center)
+      Row() {
+        Image($r('app.media.ic_dns_filled'))
+          .width(16)
+          .height(16)
+          .fillColor($r('app.color.text_secondary'))
+          .margin({ right: $r('app.float.space_sm') })
+        Text('支持多选，将并发请求所有选中的DNS服务')
+          .fontSize($r('app.float.text_size_small'))
+          .fontColor($r('app.color.text_secondary'))
+      }
+      .width('100%')
+      .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg'), top: $r('app.float.space_sm')})
+      .alignItems(VerticalAlign.Center)
 
-        List({ space: 12 }) {
-          ForEach(this.dnsList, (item: DnsInfo) => {
-            ListItem() {
-              Row() {
-                Column() {
-                  Checkbox({ name: 'checkbox_' + item.id })
-                    .select(this.selectedDnsIds.includes(item.id))
-                    .selectedColor($r('app.color.brand_color'))
-                    .hitTestBehavior(HitTestMode.None)
-                }
-                .justifyContent(FlexAlign.Center)
-                .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_sm') })
+      List({ space: 12 }) {
+        ForEach(this.dnsList, (item: DnsInfo) => {
+          HdsListItemCard({
+            onClick: () => {
+              DnsDataManager.getInstance().toggleDnsId(item.id);
+            }
+          }) {
+            Row() {
+              Column() {
+                Checkbox({ name: 'checkbox_' + item.id })
+                  .select(this.selectedDnsIds.includes(item.id))
+                  .selectedColor($r('app.color.brand_color'))
+                  .hitTestBehavior(HitTestMode.None)
+              }
+              .justifyContent(FlexAlign.Center)
+              .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_sm') })
 
-                Column() {
-                  Row() {
-                    Column() {
-                      Row() {
-                        Text(item.name)
-                          .fontSize($r('app.float.text_size_body'))
-                          .fontColor($r('app.color.text_primary'))
-                          .fontWeight(FontWeight.Medium)
+              Column() {
+                Row() {
+                  Column() {
+                    Row() {
+                      Text(item.name)
+                        .fontSize($r('app.float.text_size_body'))
+                        .fontColor($r('app.color.text_primary'))
+                        .fontWeight(FontWeight.Medium)
 
-                        DnsTag({
-                          type: item.type || DnsType.UDP,
-                          isDefault: item.isDefault
-                        })
-                      }
-                      .alignItems(VerticalAlign.Center)
+                      DnsTag({
+                        type: item.type || DnsType.UDP,
+                        isDefault: item.isDefault
+                      })
+                    }
+                    .alignItems(VerticalAlign.Center)
 
-                      Text(item.primaryDns)
+                    Text(item.primaryDns)
                       .fontSize($r('app.float.text_size_small'))
                       .fontColor($r('app.color.text_secondary'))
                       .margin({ top: $r('app.float.space_xs') })
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-                      .maxLines(1)
-                    }
-                    .layoutWeight(1)
-                    .alignItems(HorizontalAlign.Start)
+                  }
+                  .alignItems(HorizontalAlign.Start)
+                  .layoutWeight(1)
 
-                    if (!this.selectedDnsIds.includes(item.id)) {
-                      Row() {
-                        if (!item.isDefault) {
-                          Image($r('app.media.ic_public_edit'))
-                            .width($r('app.float.icon_size_secondary'))
-                            .height($r('app.float.icon_size_secondary'))
-                            .fillColor($r('app.color.brand_color'))
-                            .onClick(() => {
-                              router.pushUrl({
-                                url: 'pages/DnsEditPage',
-                                params: {
-                                  id: item.id
-                                }
-                              })
-                            })
-                            .margin({ right: $r('app.float.space_lg') })
-                        }
-                        
-                        Image($r('app.media.ic_public_delete'))
-                          .width($r('app.float.icon_size_secondary'))
-                          .height($r('app.float.icon_size_secondary'))
-                          .fillColor($r('app.color.functional_red'))
-                          .onClick(async () => {
-                             await DnsDataManager.getInstance().removeDns(item.id);
-                             promptAction.showToast({ message: '删除成功' });
-                          })
-                      }
-                      .padding({ left: $r('app.float.space_xs') })
+                  if (!item.isDefault) {
+                    Column() {
+                      Image($r('app.media.ic_public_delete'))
+                        .width($r('app.float.icon_size_secondary'))
+                        .height($r('app.float.icon_size_secondary'))
+                        .fillColor($r('app.color.functional_red'))
+                        .onClick(() => {
+                          promptAction.showDialog({
+                            title: '删除确认',
+                            message: `确定要删除 ${item.name} 吗？`,
+                            buttons: [
+                              { text: '取消', color: '#000000' },
+                              { text: '删除', color: '#FF0000' }
+                            ]
+                          }).then((resp) => {
+                            if (resp.index === 1) {
+                              DnsDataManager.getInstance().deleteDns(item.id);
+                            }
+                          });
+                        })
                     }
                   }
-                  .width('100%')
                   .alignItems(VerticalAlign.Center)
                 }
-                .layoutWeight(1)
-                .padding({ top: $r('app.float.space_lg'), bottom: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
-                .justifyContent(FlexAlign.Center)
               }
               .width('100%')
-              .backgroundColor($r('app.color.card_background'))
-              .borderRadius(12)
-              .onClick(() => {
-                // 点击整个卡片（非删除区）切换选中
-                DnsDataManager.getInstance().toggleDnsId(item.id);
-              })
+              .padding({ top: $r('app.float.space_lg'), bottom: $r('app.float.space_lg'), right: $r('app.float.space_lg') })
             }
-            .clip(true)
-            .borderRadius(12)
-          }, (item: DnsInfo) => JSON.stringify(item) + '_' + (this.selectedDnsIds.includes(item.id) ? 'selected' : 'unselected'))
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .padding({ top: $r('app.float.space_lg'), left: $r('app.float.space_lg'), right: $r('app.float.space_lg'), bottom: $r('app.float.space_lg') })
-        .backgroundColor($r('app.color.start_window_background'))
+            .width('100%')
+          }
+        }, (item: DnsInfo) => JSON.stringify(item) + '_' + (this.selectedDnsIds.includes(item.id) ? 'selected' : 'unselected'))
       }
       .width('100%')
-      .height('100%')
+      .layoutWeight(1)
+      .padding({ top: $r('app.float.space_lg'), left: $r('app.float.space_lg'), right: $r('app.float.space_lg'), bottom: $r('app.float.space_lg') })
       .backgroundColor($r('app.color.start_window_background'))
     }
-    .title(this.NavigationTitle())
-    .titleMode(NavigationTitleMode.Mini)
-    .menus(this.NavigationMenus())
     .width('100%')
     .height('100%')
-    .padding({ top: this.topSafeHeight })
-    .hideBackButton(true)
-    .backgroundColor($r('app.color.tab_bar_background'))
+    .backgroundColor($r('app.color.start_window_background'))
   }
 }

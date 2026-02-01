@@ -1,23 +1,17 @@
 import { DnsInfo, DnsType } from '../model/DnsInfo';
 import { DnsDataManager } from '../utils/DnsDataManager';
-import { promptAction, router } from '@kit.ArkUI';
-import { CommonNavigationTitle, DnsTag } from '../component/CommonComponents';
+import { promptAction, AppStorageV2 } from '@kit.ArkUI';
+import { DnsTag } from '../component/CommonComponents';
+import { HdsNavDestination, HdsListItemCard } from '../component/HdsComponents';
 
-@Entry
-@Component
-struct BackupDnsPage {
-  @StorageLink('backupDnsList') backupDnsList: DnsInfo[] = [];
-  @StorageLink('currentBackupDnsId') currentBackupDnsId: string = '';
-  @StorageProp('topSafeHeight') topSafeHeight: number = 0;
-  @StorageProp('bottomSafeHeight') bottomSafeHeight: number = 0;
+@ComponentV2
+export default struct BackupDnsPage {
+  @Local backupDnsList: DnsInfo[] = AppStorageV2.connect(Array, 'backupDnsList', () => [])!;
+  @Local currentBackupDnsId: string = AppStorageV2.connect(String, 'currentBackupDnsId', () => '')!;
+  @Local navPathStack: NavPathStack = AppStorageV2.connect(NavPathStack, 'navPathStack', () => new NavPathStack())!;
 
   async aboutToAppear() {
     DnsDataManager.getInstance().init(getContext(this));
-  }
-
-  @Builder
-  NavigationTitle() {
-    CommonNavigationTitle({ title: '备用 DNS' })
   }
 
   @Builder
@@ -30,9 +24,9 @@ struct BackupDnsPage {
           .fillColor($r('app.color.brand_color'))
       }
       .onClick(() => {
-        router.pushUrl({
-          url: 'pages/DnsEditPage',
-          params: { isBackup: true }
+        this.navPathStack.pushPath({
+          name: 'DnsEditPage',
+          param: { isBackup: true }
         });
       })
       .backgroundColor(Color.Transparent)
@@ -44,7 +38,7 @@ struct BackupDnsPage {
   }
 
   build() {
-    Navigation() {
+    HdsNavDestination({ title: '备用 DNS', menus: this.NavigationMenus }) {
       if (this.backupDnsList.length === 0) {
         Column() {
           Image($r('app.media.ic_dns'))
@@ -59,11 +53,14 @@ struct BackupDnsPage {
         .width('100%')
         .height('100%')
         .justifyContent(FlexAlign.Center)
-        .backgroundColor($r('app.color.start_window_background'))
       } else {
         List({ space: 12 }) {
           ForEach(this.backupDnsList, (item: DnsInfo) => {
-            ListItem() {
+            HdsListItemCard({
+              onClick: () => {
+                DnsDataManager.getInstance().setCurrentBackupDnsId(item.id);
+              }
+            }) {
               Row() {
                 Radio({ value: item.id, group: 'backupDnsGroup' })
                   .checked(item.id === this.currentBackupDnsId)
@@ -103,9 +100,9 @@ struct BackupDnsPage {
                       .height($r('app.float.icon_size_secondary'))
                       .fillColor($r('app.color.brand_color'))
                       .onClick(() => {
-                        router.pushUrl({
-                          url: 'pages/DnsEditPage',
-                          params: {
+                        this.navPathStack.pushPath({
+                          name: 'DnsEditPage',
+                          param: {
                             id: item.id,
                             isBackup: true
                           }
@@ -124,28 +121,12 @@ struct BackupDnsPage {
                   }
                 }
               }
-              .width('100%')
-              .padding($r('app.float.space_lg'))
-              .backgroundColor($r('app.color.card_background'))
-              .borderRadius(12)
-              .onClick(() => {
-                DnsDataManager.getInstance().setCurrentBackupDnsId(item.id);
-              })
             }
           }, (item: DnsInfo) => item.id + '_' + (item.id === this.currentBackupDnsId ? 'selected' : 'unselected'))
         }
         .width('100%')
         .height('100%')
-        .padding({ left: $r('app.float.space_lg'), right: $r('app.float.space_lg'), top: $r('app.float.space_lg'), })
-        .backgroundColor($r('app.color.start_window_background'))
       }
     }
-    .title(this.NavigationTitle())
-    .menus(this.NavigationMenus())
-    .titleMode(NavigationTitleMode.Mini)
-    .width('100%')
-    .height('100%')
-    .backgroundColor($r('app.color.tab_bar_background'))
-    .padding({ top: this.topSafeHeight })
   }
 }
